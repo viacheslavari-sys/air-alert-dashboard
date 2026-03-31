@@ -2,13 +2,15 @@ import { useAlertsData } from './hooks/useAlertsData'
 import { HourlyChart } from './components/HourlyChart'
 import { DurationChart } from './components/DurationChart'
 import { StatsCards } from './components/StatsCards'
+import { HeatmapChart } from './components/HeatmapChart'
+import { ForecastChart } from './components/ForecastChart'
 
 const REGIONS = {
   kyiv    : { label: 'Вишгородський р-н', sub: 'Київська обл.' },
   zhytomyr: { label: 'Житомирський р-н',  sub: 'Житомирська обл.' },
 }
 
-function RegionBlock({ regionKey, data, label, sub }) {
+function RegionBlock({ data, label, sub }) {
   if (!data) return null
   return (
     <div className="region-block">
@@ -17,6 +19,8 @@ function RegionBlock({ regionKey, data, label, sub }) {
         <span className="region-sub">{sub}</span>
       </div>
       <StatsCards stats={data.stats} />
+      <HeatmapChart alerts={data.alerts} />
+      <ForecastChart alerts={data.alerts} />
       <HourlyChart data={data.hourlyData} />
       <DurationChart hourlyData={data.hourlyData} dailyData={data.dailyData} />
     </div>
@@ -83,18 +87,8 @@ export default function App() {
 
         {!loading && (
           <div className="comparison-grid">
-            <RegionBlock
-              regionKey="kyiv"
-              data={kyiv}
-              label={REGIONS.kyiv.label}
-              sub={REGIONS.kyiv.sub}
-            />
-            <RegionBlock
-              regionKey="zhytomyr"
-              data={zhytomyr}
-              label={REGIONS.zhytomyr.label}
-              sub={REGIONS.zhytomyr.sub}
-            />
+            <RegionBlock data={kyiv}     label={REGIONS.kyiv.label}     sub={REGIONS.kyiv.sub} />
+            <RegionBlock data={zhytomyr} label={REGIONS.zhytomyr.label} sub={REGIONS.zhytomyr.sub} />
           </div>
         )}
       </main>
