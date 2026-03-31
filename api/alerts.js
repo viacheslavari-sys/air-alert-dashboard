@@ -18,7 +18,6 @@
  * через поле location_raion === 'Вишгородський район'.
  */
 
-export const config = { runtime: 'edge' }
 
 const API_BASE      = 'https://api.alerts.in.ua/v1'
 const OBLAST_UID    = 14   // Київська область
