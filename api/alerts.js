@@ -1,6 +1,12 @@
 const API_BASE   = 'https://api.alerts.in.ua/v1'
 const OBLAST_UID = 14
-const RAION_NAME = 'Вишгородський район'
+
+// Фільтруємо по location_title та location_uid
+// Вишгородський район — визначаємо за назвою (надійніше ніж UID)
+const TARGET_TITLES = [
+  'Вишгородський район',
+  'Київська область',   // обласні тривоги стосуються всіх районів
+]
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -47,21 +53,21 @@ module.exports = async function handler(req, res) {
     if (type === 'history') {
       const all = Array.isArray(raw?.alerts) ? raw.alerts : []
 
-      // DEBUG: повертаємо сирі дані щоб побачити структуру
-      const debug = req.query.debug === '1'
-      if (debug) {
+      // DEBUG режим — показує всі унікальні райони
+      if (req.query.debug === '1') {
+        const titles = [...new Set(all.map(a => a.location_title))].sort()
         return res.status(200).json({
           total_raw: all.length,
-          sample: all.slice(0, 3),
-          unique_location_types: [...new Set(all.map(a => a.location_type))],
-          unique_raions: [...new Set(all.map(a => a.location_raion).filter(Boolean))].slice(0, 10),
+          all_titles: titles,
+          sample: all.slice(0, 2),
         })
       }
 
+      // Фільтруємо по location_title
       const filtered = all.filter(a =>
-        a.location_type === 'oblast' ||
-        a.location_raion === RAION_NAME
+        TARGET_TITLES.includes(a.location_title)
       )
+
       res.setHeader('Cache-Control', 'public, s-maxage=300')
       return res.status(200).json({
         alerts    : filtered,
