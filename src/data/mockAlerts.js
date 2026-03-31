@@ -137,3 +137,132 @@ export function computeSummaryStats(alerts) {
     daysWithAlerts: days.size,
   }
 }
+
+/**
+ * Теплова карта: година (0–23) × день тижня (0=Пн, 6=Нд)
+ * Повертає матрицю 7×24 з імовірністю тривоги в кожній комірці.
+ * Імовірність = кількість тижнів де була тривога в цей слот / загальна кількість тижнів.
+ */
+export function computeHeatmap(alerts) {
+  // Скільки унікальних тижнів у даних
+  const weekSet = new Set()
+  alerts.forEach(a => {
+    const d = new Date(a.started_at)
+    // ISO-тиждень як ключ
+    const jan4 = new Date(d.getFullYear(), 0, 4)
+    const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7)
+    weekSet.add(`${d.getFullYear()}-W${week}`)
+  })
+  const totalWeeks = Math.max(weekSet.size, 1)
+
+  // Матриця hits[dayOfWeek][hour] = кількість унікальних тижнів з тривогою
+  const hits = Array.from({ length: 7 }, () => Array(24).fill(0))
+  const slotWeeks = Array.from({ length: 7 }, () =>
+    Array.from({ length: 24 }, () => new Set())
+  )
+
+  alerts.forEach(a => {
+    const d = new Date(a.started_at)
+    // JS: 0=Нд, перетворюємо на 0=Пн
+    const dow = (d.getDay() + 6) % 7
+    const hour = d.getHours()
+    const jan4 = new Date(d.getFullYear(), 0, 4)
+    const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7)
+    slotWeeks[dow][hour].add(`${d.getFullYear()}-W${week}`)
+  })
+
+  const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
+
+  return {
+    totalWeeks,
+    cells: DAY_LABELS.map((day, dow) =>
+      Array.from({ length: 24 }, (_, hour) => ({
+        day,
+        dow,
+        hour,
+        label: `${String(hour).padStart(2, '0')}:00`,
+        count: slotWeeks[dow][hour].size,
+        probability: slotWeeks[dow][hour].size / totalWeeks,
+      }))
+    ),
+  }
+}
+
+/**
+ * Прогноз на наступні N годин на основі статистики.
+ * Для кожної майбутньої години повертає:
+ *   - базову імовірність (з теплової карти)
+ *   - скориговану імовірність з урахуванням інтервалу після останньої тривоги
+ *   - довірчий інтервал (±1σ на основі бінарної дисперсії)
+ */
+export function computeForecast(alerts, hoursAhead = 6) {
+  const heatmap = computeHeatmap(alerts)
+
+  // Час останньої тривоги
+  const sorted = [...alerts].sort(
+    (a, b) => new Date(b.started_at) - new Date(a.started_at)
+  )
+  const lastAlert = sorted[0] ? new Date(sorted[0].started_at) : null
+
+  // Середній інтервал між тривогами (години)
+  let avgIntervalHours = null
+  if (sorted.length > 1) {
+    const intervals = []
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const diff =
+        (new Date(sorted[i].started_at) - new Date(sorted[i + 1].started_at)) /
+        3600000
+      if (diff > 0 && diff < 72) intervals.push(diff) // ігноруємо аномальні паузи
+    }
+    if (intervals.length > 0) {
+      avgIntervalHours =
+        intervals.reduce((s, v) => s + v, 0) / intervals.length
+    }
+  }
+
+  const now = new Date()
+  const slots = []
+
+  for (let i = 1; i <= hoursAhead; i++) {
+    const future = new Date(now.getTime() + i * 3600000)
+    const dow  = (future.getDay() + 6) % 7
+    const hour = future.getHours()
+
+    const baseProbability = heatmap.cells[dow][hour].probability
+
+    // Корекція на інтервал: якщо пройшло більше середнього інтервалу — ризик зростає
+    let adjustedProbability = baseProbability
+    if (lastAlert && avgIntervalHours) {
+      const hoursSinceLast = (now - lastAlert) / 3600000 + i
+      const intervalRatio  = hoursSinceLast / avgIntervalHours
+      // Логістична корекція: плавно підвищуємо від 0.8x до 1.3x
+      const correction = 0.8 + 0.5 / (1 + Math.exp(-2 * (intervalRatio - 1)))
+      adjustedProbability = Math.min(baseProbability * correction, 0.95)
+    }
+
+    // Довірчий інтервал Вілсона для бінарних пропорцій
+    const n = heatmap.totalWeeks
+    const p = baseProbability
+    const z = 1.645 // 90% CI
+    const margin = n > 0
+      ? z * Math.sqrt((p * (1 - p)) / n)
+      : 0.1
+
+    slots.push({
+      hour        : future.getHours(),
+      dow         : dow,
+      dayLabel    : heatmap.cells[dow][hour].day,
+      label       : future.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }),
+      fullLabel   : future.toLocaleDateString('uk-UA', { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+      baseProbability,
+      adjustedProbability,
+      ciLow       : Math.max(0, adjustedProbability - margin),
+      ciHigh      : Math.min(1, adjustedProbability + margin),
+      hoursFromNow: i,
+      avgIntervalHours,
+      hoursSinceLast: lastAlert ? (now - lastAlert) / 3600000 : null,
+    })
+  }
+
+  return { slots, avgIntervalHours, lastAlert: lastAlert?.toISOString() ?? null }
+}
