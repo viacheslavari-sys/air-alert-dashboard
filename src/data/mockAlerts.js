@@ -1,135 +1,139 @@
 /**
- * Реалістичні мокові дані для Вишгородського р-ну, Київська обл.
- * Патерни базовані на публічній статистиці тривог по Київщині за 2024-2025 рр.
- *
- * Особливості реальних патернів:
- * - Пік активності: 3:00–6:00 (нічні удари) та 11:00–14:00 (денні)
- * - Вихідні не суттєво відрізняються від буднів
- * - Тривалість: 45 хв – 3 год, середня ~90 хв
- * - Найспокійніший час: 8:00–10:00 та 17:00–20:00
+ * Моковані дані тривог для Вишгородського р-ну, Київська обл.
+ * Патерни: нічний пік 02–05, ранковий 08–10, вечірній 18–20.
  */
 
-import { subDays, format, addMinutes, startOfDay, setHours, setMinutes } from 'date-fns'
-
-const SEED_ALERTS = [
-  // (startHour, durationMin, daysAgo)
-  [3, 110, 1], [5, 85, 1],
-  [2, 135, 2], [14, 60, 2],
-  [4, 95, 3],
-  [3, 120, 4], [12, 75, 4],
-  [1, 150, 5], [6, 55, 5], [13, 80, 5],
-  [5, 100, 6],
-  [4, 115, 7], [11, 65, 7],
-  [2, 90, 8], [15, 50, 8],
-  [3, 140, 9],
-  [6, 70, 10], [12, 85, 10],
-  [4, 105, 11], [14, 60, 11],
-  [2, 130, 12],
-  [5, 80, 13], [11, 70, 13], [22, 45, 13],
-  [3, 95, 14],
-  [4, 110, 15], [13, 65, 15],
-  [1, 145, 16],
-  [6, 85, 17], [12, 90, 17],
-  [3, 120, 18], [14, 55, 18],
-  [5, 100, 19],
-  [2, 115, 20], [11, 75, 20],
-  [4, 95, 21],
-  [3, 135, 22], [13, 60, 22], [23, 50, 22],
-  [6, 80, 23],
-  [4, 110, 24], [14, 70, 24],
-  [2, 125, 25],
-  [5, 90, 26], [12, 65, 26],
-  [3, 105, 27],
-  [4, 115, 28], [13, 80, 28],
-  [1, 150, 29], [6, 60, 29],
-  [3, 95, 30],
+const HOURLY_PROBABILITY = [
+  0.08, 0.12, 0.22, 0.28, 0.31, 0.26,
+  0.18, 0.14, 0.19, 0.21, 0.16, 0.11,
+  0.09, 0.07, 0.06, 0.05, 0.06, 0.08,
+  0.10, 0.13, 0.11, 0.09, 0.08, 0.08,
 ]
 
-const now = new Date()
+const DURATION_BY_HOUR = [
+  55, 60, 65, 70, 72, 68, 55, 45,
+  42, 40, 38, 35, 32, 30, 28, 30,
+  33, 38, 42, 48, 50, 52, 53, 55,
+]
 
-export const mockAlerts = SEED_ALERTS.map(([startHour, durationMin, daysAgo], i) => {
-  const base = subDays(now, daysAgo)
-  const startedAt = setMinutes(setHours(startOfDay(base), startHour), (i * 7) % 55)
-  const finishedAt = addMinutes(startedAt, durationMin)
-  return {
-    id: i + 1,
-    region: 'Вишгородський район',
-    oblast: 'Київська область',
-    started_at: startedAt.toISOString(),
-    finished_at: finishedAt.toISOString(),
-    alert_type: 'air_raid',
-    duration_minutes: durationMin,
+function seededRandom(seed) {
+  let s = seed
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff
+    return (s >>> 0) / 0xffffffff
   }
-})
+}
 
-/** Підрахунок імовірності тривоги по годинах (0–23) */
+export function generateMockAlerts() {
+  const rand = seededRandom(20240301)
+  const now = new Date()
+  const alerts = []
+
+  const start = new Date(now)
+  start.setDate(start.getDate() - 30)
+  start.setMinutes(0, 0, 0)
+
+  const current = new Date(start)
+  while (current < now) {
+    const hour = current.getHours()
+    const prob = HOURLY_PROBABILITY[hour]
+    const noise = (rand() - 0.5) * 0.1
+    const effective = Math.max(0, Math.min(1, prob + noise))
+
+    if (rand() < effective * 0.35) {
+      const baseDuration = DURATION_BY_HOUR[hour]
+      const durationMinutes = Math.round(baseDuration * (0.6 + rand() * 0.8))
+
+      const startTime = new Date(current)
+      startTime.setMinutes(Math.floor(rand() * 55))
+
+      const endTime = new Date(startTime)
+      endTime.setMinutes(endTime.getMinutes() + durationMinutes)
+
+      alerts.push({
+        id: `mock-${alerts.length}`,
+        started_at: startTime.toISOString(),
+        finished_at: endTime < now ? endTime.toISOString() : null,
+        duration_minutes: durationMinutes,
+        location_type: 'raion',
+        location_raion: 'Вишгородський район',
+      })
+    }
+
+    current.setHours(current.getHours() + 1)
+  }
+
+  return alerts
+}
+
 export function computeHourlyProbability(alerts) {
-  const counts = Array(24).fill(0)
-  const days = new Set()
+  const hourData = Array.from({ length: 24 }, (_, h) => ({
+    hour: h,
+    label: `${String(h).padStart(2, '0')}:00`,
+    totalAlerts: 0,
+    totalDuration: 0,
+    daysWithAlert: 0,
+    probability: 0,
+    avgDuration: 0,
+  }))
 
-  alerts.forEach(a => {
+  const hourDaySet = Array.from({ length: 24 }, () => new Set())
+
+  alerts.forEach((a) => {
     const start = new Date(a.started_at)
-    const end   = new Date(a.finished_at)
-    const dayKey = format(start, 'yyyy-MM-dd')
-    days.add(dayKey)
+    const h = start.getHours()
+    const dayKey = a.started_at.slice(0, 10)
+    hourDaySet[h].add(dayKey)
+    hourData[h].totalAlerts++
+    hourData[h].totalDuration += a.duration_minutes || 0
+  })
 
-    // Позначаємо кожну годину, яку покриває тривога
-    let cursor = new Date(start)
-    cursor.setMinutes(0, 0, 0)
-    while (cursor <= end) {
-      counts[cursor.getHours()]++
-      cursor = addMinutes(cursor, 60)
+  return hourData.map((d, h) => ({
+    ...d,
+    daysWithAlert: hourDaySet[h].size,
+    probability: hourDaySet[h].size / 30,
+    avgDuration: d.totalAlerts > 0 ? Math.round(d.totalDuration / d.totalAlerts) : 0,
+  }))
+}
+
+export function computeDailyAlerts(alerts) {
+  const now = new Date()
+  const byDay = {}
+
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i)
+    const key = d.toISOString().slice(0, 10)
+    byDay[key] = { date: key, count: 0, totalDuration: 0 }
+  }
+
+  alerts.forEach((a) => {
+    const key = a.started_at.slice(0, 10)
+    if (byDay[key]) {
+      byDay[key].count++
+      byDay[key].totalDuration += a.duration_minutes || 0
     }
   })
 
-  const totalDays = days.size || 1
-  return counts.map((count, hour) => ({
-    hour,
-    label: `${String(hour).padStart(2, '0')}:00`,
-    probability: Math.round((count / totalDays) * 100),
-    count,
-  }))
+  return Object.values(byDay)
 }
 
-/** Середня тривалість по днях тижня */
-export function computeWeekdayDuration(alerts) {
-  const days = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
-  const buckets = Array(7).fill(null).map(() => ({ total: 0, count: 0 }))
+export function computeSummaryStats(alerts) {
+  const total = alerts.length
+  if (total === 0) return { total: 0, avgDuration: 0, maxDuration: 0, minDuration: 0, daysWithAlerts: 0 }
 
-  alerts.forEach(a => {
-    const d = new Date(a.started_at).getDay()
-    buckets[d].total += a.duration_minutes
-    buckets[d].count += 1
-  })
+  const durations = alerts.map((a) => a.duration_minutes || 0)
+  const avgDuration = Math.round(durations.reduce((s, d) => s + d, 0) / total)
+  const maxDuration = Math.max(...durations)
+  const minDuration = Math.min(...durations)
 
-  return buckets.map((b, i) => ({
-    day: days[i],
-    avgDuration: b.count ? Math.round(b.total / b.count) : 0,
-    count: b.count,
-  }))
-}
-
-/** Зведена статистика */
-export function computeStats(alerts) {
-  const durations = alerts.map(a => a.duration_minutes)
-  const avg = durations.reduce((s, d) => s + d, 0) / (durations.length || 1)
-  const max = Math.max(...durations)
-  const min = Math.min(...durations)
-
-  const byDay = {}
-  alerts.forEach(a => {
-    const k = format(new Date(a.started_at), 'yyyy-MM-dd')
-    byDay[k] = (byDay[k] || 0) + 1
-  })
-  const days = Object.values(byDay)
-  const avgPerDay = days.reduce((s, d) => s + d, 0) / (days.length || 1)
+  const days = new Set(alerts.map((a) => a.started_at.slice(0, 10)))
 
   return {
-    total: alerts.length,
-    avgDuration: Math.round(avg),
-    maxDuration: max,
-    minDuration: min,
-    avgPerDay: avgPerDay.toFixed(1),
-    activeDays: Object.keys(byDay).length,
+    total,
+    avgDuration,
+    maxDuration,
+    minDuration,
+    daysWithAlerts: days.size,
   }
 }
