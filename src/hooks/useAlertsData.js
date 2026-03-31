@@ -6,7 +6,6 @@ import {
   computeDailyAlerts,
 } from '../data/mockAlerts'
 
-// Використовуємо реальний API тільки якщо явно встановлено VITE_USE_MOCK=false
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
 function normalizeAlerts(raw) {
@@ -18,15 +17,13 @@ function normalizeAlerts(raw) {
     duration_minutes: a.finished_at
       ? Math.round((new Date(a.finished_at) - new Date(a.started_at)) / 60000)
       : null,
-    location_type   : a.location_type,
     location_title  : a.location_title,
-    location_raion  : a.location_raion ?? null,
     alert_type      : a.alert_type,
   }))
 }
 
-async function fetchHistory() {
-  const res = await fetch('/api/alerts?type=history')
+async function fetchHistory(region) {
+  const res = await fetch(`/api/alerts?type=history&region=${region}`)
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.error || `HTTP ${res.status}`)
@@ -34,50 +31,73 @@ async function fetchHistory() {
   return res.json()
 }
 
-function buildState(alerts, extra = {}) {
+function buildRegionState(alerts) {
   return {
-    loading   : false,
-    alerts,
+    alerts    : alerts,
     hourlyData: computeHourlyProbability(alerts),
     dailyData : computeDailyAlerts(alerts),
     stats     : computeSummaryStats(alerts),
-    isMock    : USE_MOCK,
-    error     : null,
-    ...extra,
   }
 }
 
 export function useAlertsData() {
   const [state, setState] = useState({
-    loading   : true,
-    error     : null,
-    alerts    : [],
-    hourlyData: [],
-    dailyData : [],
-    stats     : null,
-    isMock    : USE_MOCK,
+    loading : true,
+    error   : null,
+    isMock  : USE_MOCK,
+    kyiv    : null,
+    zhytomyr: null,
   })
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
-      // Моковий режим — синхронно, без fetch
       if (USE_MOCK) {
-        const alerts = generateMockAlerts()
-        if (!cancelled) setState(buildState(alerts))
+        // Генеруємо моки для обох регіонів
+        const kyivAlerts     = generateMockAlerts()
+        const zhytomyrAlerts = generateMockAlerts()
+        if (!cancelled) {
+          setState({
+            loading : false,
+            error   : null,
+            isMock  : true,
+            kyiv    : buildRegionState(kyivAlerts),
+            zhytomyr: buildRegionState(zhytomyrAlerts),
+          })
+        }
         return
       }
 
-      // Реальний API
+      // Паралельні запити для обох регіонів
       try {
-        const raw = await fetchHistory()
-        const alerts = normalizeAlerts(raw)
-        if (!cancelled) setState(buildState(alerts))
+        const [kyivRaw, zhytomyrRaw] = await Promise.all([
+          fetchHistory('kyiv'),
+          fetchHistory('zhytomyr'),
+        ])
+
+        if (!cancelled) {
+          setState({
+            loading : false,
+            error   : null,
+            isMock  : false,
+            kyiv    : buildRegionState(normalizeAlerts(kyivRaw)),
+            zhytomyr: buildRegionState(normalizeAlerts(zhytomyrRaw)),
+          })
+        }
       } catch (err) {
-        // Fallback на моки якщо API недоступне
-        const alerts = generateMockAlerts()
-        if (!cancelled) setState(buildState(alerts, { error: err.message, isMock: true }))
+        // Fallback на моки
+        const kyivAlerts     = generateMockAlerts()
+        const zhytomyrAlerts = generateMockAlerts()
+        if (!cancelled) {
+          setState({
+            loading : false,
+            error   : err.message,
+            isMock  : true,
+            kyiv    : buildRegionState(kyivAlerts),
+            zhytomyr: buildRegionState(zhytomyrAlerts),
+          })
+        }
       }
     }
 
