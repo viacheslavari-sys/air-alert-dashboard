@@ -1,34 +1,24 @@
+import { useState } from 'react'
 import { useAlertsData } from './hooks/useAlertsData'
-import { HourlyChart } from './components/HourlyChart'
-import { DurationChart } from './components/DurationChart'
+import { RegionFilter } from './components/RegionFilter'
 import { StatsCards } from './components/StatsCards'
 import { HeatmapChart } from './components/HeatmapChart'
 import { ForecastChart } from './components/ForecastChart'
-
-const REGIONS = {
-  kyiv    : { label: 'Вишгородський р-н', sub: 'Київська обл.' },
-  zhytomyr: { label: 'Житомирський р-н',  sub: 'Житомирська обл.' },
-}
-
-function RegionBlock({ data, label, sub }) {
-  if (!data) return null
-  return (
-    <div className="region-block">
-      <div className="region-heading">
-        <span className="region-label">{label}</span>
-        <span className="region-sub">{sub}</span>
-      </div>
-      <StatsCards stats={data.stats} />
-      <HeatmapChart alerts={data.alerts} />
-      <ForecastChart alerts={data.alerts} />
-      <HourlyChart data={data.hourlyData} />
-      <DurationChart hourlyData={data.hourlyData} dailyData={data.dailyData} />
-    </div>
-  )
-}
+import { HourlyChart } from './components/HourlyChart'
+import { DurationChart } from './components/DurationChart'
 
 export default function App() {
   const { loading, error, isMock, kyiv, zhytomyr } = useAlertsData()
+  const [selectedRegions, setSelectedRegions] = useState(['kyiv'])
+
+  const dataMap = { kyiv, zhytomyr }
+  const activeRegions = selectedRegions.filter(k => dataMap[k])
+
+  // Зводимо дані для компонентів
+  const statsMap    = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.stats]))
+  const alertsMap   = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.alerts ?? []]))
+  const hourlyMap   = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.hourlyData ?? []]))
+  const dailyMap    = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.dailyData ?? []]))
 
   return (
     <div className="app">
@@ -45,7 +35,12 @@ export default function App() {
               <span className="title-icon">⚠</span>
               Аналітика тривог
             </h1>
-            <p className="header-sub">Порівняння регіонів · 30 днів</p>
+            <p className="header-sub">
+              {activeRegions.length === 1
+                ? activeRegions[0] === 'kyiv' ? 'Вишгородський р-н · Київська обл.' : 'Житомирський р-н · Житомирська обл.'
+                : 'Порівняння регіонів'
+              } · 30 днів
+            </p>
           </div>
         </div>
         <div className="header-right">
@@ -63,6 +58,8 @@ export default function App() {
       </header>
 
       <main className="main">
+        <RegionFilter selected={selectedRegions} onChange={setSelectedRegions} />
+
         {loading && (
           <div className="loading">
             <div className="loading-spinner" />
@@ -73,9 +70,7 @@ export default function App() {
         {error && (
           <div className="notice notice--warn">
             <div>⚠ API недоступне — показано демо-дані</div>
-            <code style={{ fontSize: '11px', opacity: 0.7, display: 'block', marginTop: '6px' }}>
-              {error}
-            </code>
+            <code style={{ fontSize: '11px', opacity: 0.7, display: 'block', marginTop: '6px' }}>{error}</code>
           </div>
         )}
 
@@ -85,11 +80,22 @@ export default function App() {
           </div>
         )}
 
-        {!loading && (
-          <div className="comparison-grid">
-            <RegionBlock data={kyiv}     label={REGIONS.kyiv.label}     sub={REGIONS.kyiv.sub} />
-            <RegionBlock data={zhytomyr} label={REGIONS.zhytomyr.label} sub={REGIONS.zhytomyr.sub} />
-          </div>
+        {!loading && activeRegions.length > 0 && (
+          <>
+            <StatsCards statsMap={statsMap} regionKeys={activeRegions} />
+            <HeatmapChart alertsMap={alertsMap} regionKeys={activeRegions} />
+            <ForecastChart alertsMap={alertsMap} regionKeys={activeRegions} />
+            <HourlyChart
+              data={hourlyMap[activeRegions[0]]}
+              compareData={activeRegions.length === 2 ? hourlyMap[activeRegions[1]] : null}
+              regionKeys={activeRegions}
+            />
+            <DurationChart
+              dataMap={hourlyMap}
+              dailyDataMap={dailyMap}
+              regionKeys={activeRegions}
+            />
+          </>
         )}
       </main>
 
