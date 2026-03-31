@@ -583,3 +583,111 @@ body {
   color: var(--text);
   font-weight: 600;
 }
+
+/* ── Region filter ── */
+.region-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rf-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.rf-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+}
+
+.rf-chip:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card-2);
+}
+
+.rf-chip--active {
+  border-color: rgba(59,130,246,0.5);
+  background: rgba(59,130,246,0.08);
+}
+
+.rf-chip-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+.rf-chip--active .rf-chip-label {
+  color: #93c5fd;
+}
+
+.rf-chip-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ── Heatmap compare ── */
+.hm-compare-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .hm-compare-row { grid-template-columns: 1fr; }
+}
+
+.hm-grid-wrap { display: flex; flex-direction: column; gap: 6px; }
+
+.hm-grid-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+/* ── StatsCards compare ── */
+.stat-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.stat-compare-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.stat-region-tag {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.stat-value-sm {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
