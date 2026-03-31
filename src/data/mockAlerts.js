@@ -206,6 +206,7 @@ export function computeHeatmap(alerts) {
   }
 }
 
+export function computeForecast(alerts, hoursAhead = 6) {
   const heatmap = computeHeatmap(alerts)
 
   // Час останньої тривоги
