@@ -78,11 +78,11 @@ export function ForecastChart({ alertsMap, regionKeys }) {
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ top: 16, right: 16, left: -10, bottom: 0 }} barGap={2}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-          <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }} tickLine={false} axisLine={false} />
-          <YAxis tickFormatter={v => `${(v * 100).toFixed(0)}%`} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickLine={false} axisLine={false} />
+          <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 11, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
+          <YAxis tickFormatter={v => `${(v * 100).toFixed(0)}%`} tick={{ fill: '#8899aa', fontSize: 11 }} tickLine={false} axisLine={false} />
           <Tooltip content={<ForecastTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
           <ReferenceLine y={0.2} stroke="var(--danger)" strokeDasharray="6 3" strokeOpacity={0.5} />
-          {isCompare && <Legend formatter={v => <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{v}</span>} wrapperStyle={{ paddingTop: 8 }} />}
+          {isCompare && <Legend formatter={v => v} wrapperStyle={{ paddingTop: 8 }} />}
           {regionKeys.map(k => (
             <Bar key={k} dataKey={`prob_${k}`} name={REGION_COLORS[k].name}
                  fill={REGION_COLORS[k].bar} radius={[4,4,0,0]}

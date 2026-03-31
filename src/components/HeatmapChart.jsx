@@ -51,7 +51,7 @@ function HeatmapGrid({ cells, dowTotals, dayStats, quietestDow, hue, label }) {
               <span
                 className="hm-pct-label"
                 title={`Тривога в ${pct}% випадків`}
-                style={{ color: isQuietest ? '#4ade80' : 'var(--text-muted)' }}
+                style={{ color: isQuietest ? '#4ade80' : '#8899aa' }}
               >
                 {pct}%
                 {isQuietest && <span className="hm-quiet-badge">тихо</span>}

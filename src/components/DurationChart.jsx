@@ -79,10 +79,10 @@ export function DurationChart({ dataMap, dailyDataMap, regionKeys }) {
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={hourlyMerged} margin={{ top: 10, right: 10, left: -15, bottom: 0 }} barGap={2}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-            <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 10, fontFamily: 'var(--font-mono)' }} tickLine={false} axisLine={false} interval={2} />
-            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}хв`} />
+            <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} interval={2} />
+            <YAxis tick={{ fill: '#8899aa', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}хв`} />
             <Tooltip content={<DurationTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-            {isCompare && <Legend formatter={v => <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{v}</span>} wrapperStyle={{ paddingTop: 8 }} />}
+            {isCompare && <Legend formatter={v => v} wrapperStyle={{ paddingTop: 8 }} />}
             {regionKeys.map(k => (
               <Bar key={k} dataKey={`avg_${k}`} name={REGION_COLORS[k].name}
                    fill={REGION_COLORS[k].bar} radius={[3,3,0,0]} maxBarSize={isCompare ? 14 : 24} fillOpacity={0.8} />
@@ -109,10 +109,10 @@ export function DurationChart({ dataMap, dailyDataMap, regionKeys }) {
               ))}
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-            <XAxis dataKey="shortDate" tick={{ fill: 'var(--text-muted)', fontSize: 10, fontFamily: 'var(--font-mono)' }} tickLine={false} axisLine={false} interval={6} />
-            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
+            <XAxis dataKey="shortDate" tick={{ fill: '#8899aa', fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} interval={6} />
+            <YAxis tick={{ fill: '#8899aa', fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
             <Tooltip content={<DailyTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
-            {isCompare && <Legend formatter={v => <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{v}</span>} wrapperStyle={{ paddingTop: 8 }} />}
+            {isCompare && <Legend formatter={v => v} wrapperStyle={{ paddingTop: 8 }} />}
             {regionKeys.map(k => (
               <Area key={k} type="monotone" dataKey={`count_${k}`} name={REGION_COLORS[k].name}
                     stroke={REGION_COLORS[k].area} strokeWidth={2}

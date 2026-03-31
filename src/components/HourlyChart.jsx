@@ -61,12 +61,12 @@ export function HourlyChart({ data, compareData, regionKeys }) {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }}
+            tick={{ fill: '#8899aa', fontSize: 11, fontFamily: 'monospace' }}
             tickLine={false} axisLine={false} interval={2}
           />
           <YAxis
             tickFormatter={v => `${(v * 100).toFixed(0)}%`}
-            tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+            tick={{ fill: '#8899aa', fontSize: 11 }}
             tickLine={false} axisLine={false}
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
@@ -75,7 +75,7 @@ export function HourlyChart({ data, compareData, regionKeys }) {
           {isCompare ? (
             <>
               <Legend
-                formatter={v => <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{v}</span>}
+                formatter={v => v}
                 wrapperStyle={{ paddingTop: 8 }}
               />
               <Bar dataKey="probability_kyiv"      name={REGION_COLORS.kyiv.name}
