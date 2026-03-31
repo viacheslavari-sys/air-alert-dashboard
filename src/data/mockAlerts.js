@@ -22,7 +22,7 @@ function seededRandom(seed) {
     s = (s * 1664525 + 1013904223) & 0xffffffff
     return (s >>> 0) / 0xffffffff
   }
-}
+}и
 
 export function generateMockAlerts() {
   const rand = seededRandom(20240301)

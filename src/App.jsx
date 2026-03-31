@@ -4,21 +4,26 @@ import { RegionFilter } from './components/RegionFilter'
 import { StatsCards } from './components/StatsCards'
 import { HeatmapChart } from './components/HeatmapChart'
 import { ForecastChart } from './components/ForecastChart'
-import { HourlyChart } from './components/HourlyChart'
+import { TopSlotsChart } from './components/TopSlotsChart'
 import { DurationChart } from './components/DurationChart'
 
 export default function App() {
   const { loading, error, isMock, kyiv, zhytomyr } = useAlertsData()
   const [selectedRegions, setSelectedRegions] = useState(['kyiv'])
 
-  const dataMap = { kyiv, zhytomyr }
+  const dataMap      = { kyiv, zhytomyr }
   const activeRegions = selectedRegions.filter(k => dataMap[k])
 
-  // Зводимо дані для компонентів
-  const statsMap    = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.stats]))
-  const alertsMap   = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.alerts ?? []]))
-  const hourlyMap   = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.hourlyData ?? []]))
-  const dailyMap    = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.dailyData ?? []]))
+  const statsMap   = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.stats]))
+  const alertsMap  = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.alerts ?? []]))
+  const hourlyMap  = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.hourlyData ?? []]))
+  const dailyMap   = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.dailyData ?? []]))
+
+  const regionLabel = activeRegions.length === 1
+    ? activeRegions[0] === 'kyiv'
+      ? 'Вишгородський р-н · Київська обл.'
+      : 'Житомирський р-н · Житомирська обл.'
+    : 'Порівняння регіонів'
 
   return (
     <div className="app">
@@ -35,12 +40,7 @@ export default function App() {
               <span className="title-icon">⚠</span>
               Аналітика тривог
             </h1>
-            <p className="header-sub">
-              {activeRegions.length === 1
-                ? activeRegions[0] === 'kyiv' ? 'Вишгородський р-н · Київська обл.' : 'Житомирський р-н · Житомирська обл.'
-                : 'Порівняння регіонів'
-              } · 30 днів
-            </p>
+            <p className="header-sub">{regionLabel} · 30 днів</p>
           </div>
         </div>
         <div className="header-right">
@@ -70,7 +70,9 @@ export default function App() {
         {error && (
           <div className="notice notice--warn">
             <div>⚠ API недоступне — показано демо-дані</div>
-            <code style={{ fontSize: '11px', opacity: 0.7, display: 'block', marginTop: '6px' }}>{error}</code>
+            <code style={{ fontSize: '11px', opacity: 0.7, display: 'block', marginTop: '6px' }}>
+              {error}
+            </code>
           </div>
         )}
 
@@ -84,12 +86,8 @@ export default function App() {
           <>
             <StatsCards statsMap={statsMap} regionKeys={activeRegions} />
             <HeatmapChart alertsMap={alertsMap} regionKeys={activeRegions} />
+            <TopSlotsChart alertsMap={alertsMap} regionKeys={activeRegions} />
             <ForecastChart alertsMap={alertsMap} regionKeys={activeRegions} />
-            <HourlyChart
-              data={hourlyMap[activeRegions[0]]}
-              compareData={activeRegions.length === 2 ? hourlyMap[activeRegions[1]] : null}
-              regionKeys={activeRegions}
-            />
             <DurationChart
               dataMap={hourlyMap}
               dailyDataMap={dailyMap}
