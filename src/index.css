@@ -722,3 +722,10 @@ body {
   letter-spacing: 0.03em;
   border: 1px solid rgba(74, 222, 128, 0.25);
 }
+
+/* ── Chart custom legend ── */
+.chart-legend-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
