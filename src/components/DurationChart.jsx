@@ -1,117 +1,96 @@
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  BarChart, Bar, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend,
 } from 'recharts'
+
+const REGION_COLORS = {
+  kyiv    : { bar: '#a78bfa', area: '#3b82f6', name: 'Вишгород' },
+  zhytomyr: { bar: '#fb923c', area: '#f97316', name: 'Житомир'  },
+}
 
 function DurationTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
-  const d = payload[0].payload
   return (
     <div className="tooltip-box">
-      <div className="tooltip-hour">{d.label}</div>
-      <div className="tooltip-row">
-        <span className="tooltip-label">Серед. тривалість</span>
-        <span className="tooltip-value accent">{d.avgDuration} хв</span>
-      </div>
-      <div className="tooltip-row">
-        <span className="tooltip-label">Всього тривог</span>
-        <span className="tooltip-value">{d.totalAlerts}</span>
-      </div>
+      <div className="tooltip-hour">{payload[0]?.payload?.label}</div>
+      {payload.map(p => (
+        <div className="tooltip-row" key={p.dataKey}>
+          <span className="tooltip-label" style={{ color: p.fill }}>{p.name}</span>
+          <span className="tooltip-value accent">{p.value} хв</span>
+        </div>
+      ))}
     </div>
   )
 }
 
 function DailyTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
-  const d = payload[0].payload
-  const dateStr = new Date(d.date).toLocaleDateString('uk-UA', {
-    day: 'numeric',
-    month: 'short',
-  })
+  const d = payload[0]?.payload
+  const dateStr = new Date(d.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })
   return (
     <div className="tooltip-box">
       <div className="tooltip-hour">{dateStr}</div>
-      <div className="tooltip-row">
-        <span className="tooltip-label">Тривог</span>
-        <span className="tooltip-value accent">{d.count}</span>
-      </div>
-      {d.totalDuration > 0 && (
-        <div className="tooltip-row">
-          <span className="tooltip-label">Сумарно</span>
-          <span className="tooltip-value">{d.totalDuration} хв</span>
+      {payload.map(p => (
+        <div className="tooltip-row" key={p.dataKey}>
+          <span className="tooltip-label" style={{ color: p.stroke }}>{p.name}</span>
+          <span className="tooltip-value accent">{p.value}</span>
         </div>
-      )}
+      ))}
     </div>
   )
 }
 
-export function DurationChart({ hourlyData, dailyData }) {
-  // Only hours with alerts
-  const validHours = hourlyData.filter((d) => d.totalAlerts > 0)
+export function DurationChart({ dataMap, dailyDataMap, regionKeys }) {
+  const isCompare = regionKeys.length === 2
 
-  // Format daily dates
-  const formattedDaily = dailyData.map((d) => ({
-    ...d,
-    shortDate: new Date(d.date).toLocaleDateString('uk-UA', {
-      day: 'numeric',
-      month: 'numeric',
-    }),
-  }))
+  // Мержимо погодинні дані
+  const hourlyMerged = (dataMap[regionKeys[0]] ?? [])
+    .filter(d => d.totalAlerts > 0)
+    .map((d, i) => {
+      const row = { label: d.label }
+      regionKeys.forEach(k => {
+        row[`avg_${k}`] = dataMap[k]?.[i]?.avgDuration ?? 0
+      })
+      return row
+    })
+
+  // Мержимо щоденні дані
+  const dailyMerged = (dailyDataMap[regionKeys[0]] ?? []).map((d, i) => {
+    const row = {
+      date     : d.date,
+      shortDate: new Date(d.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'numeric' }),
+    }
+    regionKeys.forEach(k => {
+      row[`count_${k}`] = dailyDataMap[k]?.[i]?.count ?? 0
+    })
+    return row
+  })
 
   return (
     <div className="charts-row">
-      {/* Duration by hour of start */}
       <div className="chart-card chart-card--half">
         <div className="chart-header">
           <div>
             <h2 className="chart-title">Середня тривалість по годинах</h2>
-            <p className="chart-subtitle">Хвилин · за годиною початку тривоги</p>
+            <p className="chart-subtitle">Хвилин · за годиною початку</p>
           </div>
         </div>
-
         <ResponsiveContainer width="100%" height={220}>
-          <BarChart
-            data={validHours}
-            margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
-          >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="rgba(255,255,255,0.05)"
-              vertical={false}
-            />
-            <XAxis
-              dataKey="label"
-              tick={{ fill: 'var(--text-muted)', fontSize: 10, fontFamily: 'var(--font-mono)' }}
-              tickLine={false}
-              axisLine={false}
-              interval={2}
-            />
-            <YAxis
-              tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(v) => `${v}хв`}
-            />
+          <BarChart data={hourlyMerged} margin={{ top: 10, right: 10, left: -15, bottom: 0 }} barGap={2}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 10, fontFamily: 'var(--font-mono)' }} tickLine={false} axisLine={false} interval={2} />
+            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}хв`} />
             <Tooltip content={<DurationTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-            <Bar
-              dataKey="avgDuration"
-              fill="var(--accent-duration)"
-              radius={[3, 3, 0, 0]}
-              fillOpacity={0.8}
-              maxBarSize={24}
-            />
+            {isCompare && <Legend formatter={v => <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{v}</span>} wrapperStyle={{ paddingTop: 8 }} />}
+            {regionKeys.map(k => (
+              <Bar key={k} dataKey={`avg_${k}`} name={REGION_COLORS[k].name}
+                   fill={REGION_COLORS[k].bar} radius={[3,3,0,0]} maxBarSize={isCompare ? 14 : 24} fillOpacity={0.8} />
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Daily alert count */}
       <div className="chart-card chart-card--half">
         <div className="chart-header">
           <div>
@@ -119,46 +98,27 @@ export function DurationChart({ hourlyData, dailyData }) {
             <p className="chart-subtitle">Кількість за останні 30 днів</p>
           </div>
         </div>
-
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart
-            data={formattedDaily}
-            margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
-          >
+          <AreaChart data={dailyMerged} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
             <defs>
-              <linearGradient id="dailyGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--accent-area)" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="var(--accent-area)" stopOpacity={0.02} />
-              </linearGradient>
+              {regionKeys.map(k => (
+                <linearGradient key={k} id={`grad_${k}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={REGION_COLORS[k].area} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={REGION_COLORS[k].area} stopOpacity={0.02} />
+                </linearGradient>
+              ))}
             </defs>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="rgba(255,255,255,0.05)"
-              vertical={false}
-            />
-            <XAxis
-              dataKey="shortDate"
-              tick={{ fill: 'var(--text-muted)', fontSize: 10, fontFamily: 'var(--font-mono)' }}
-              tickLine={false}
-              axisLine={false}
-              interval={6}
-            />
-            <YAxis
-              tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              allowDecimals={false}
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <XAxis dataKey="shortDate" tick={{ fill: 'var(--text-muted)', fontSize: 10, fontFamily: 'var(--font-mono)' }} tickLine={false} axisLine={false} interval={6} />
+            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
             <Tooltip content={<DailyTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
-            <Area
-              type="monotone"
-              dataKey="count"
-              stroke="var(--accent-area)"
-              strokeWidth={2}
-              fill="url(#dailyGrad)"
-              dot={false}
-              activeDot={{ r: 4, fill: 'var(--accent-area)', strokeWidth: 0 }}
-            />
+            {isCompare && <Legend formatter={v => <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{v}</span>} wrapperStyle={{ paddingTop: 8 }} />}
+            {regionKeys.map(k => (
+              <Area key={k} type="monotone" dataKey={`count_${k}`} name={REGION_COLORS[k].name}
+                    stroke={REGION_COLORS[k].area} strokeWidth={2}
+                    fill={`url(#grad_${k})`} dot={false}
+                    activeDot={{ r: 4, fill: REGION_COLORS[k].area, strokeWidth: 0 }} />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       </div>
