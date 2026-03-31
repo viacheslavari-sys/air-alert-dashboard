@@ -3,69 +3,97 @@ import {
   ResponsiveContainer, Cell, ReferenceLine,
 } from 'recharts'
 
-const DANGER_HOURS = [1, 2, 3, 4, 5, 6]
-
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null
   const d = payload[0].payload
   return (
-    <div className="chart-tooltip">
+    <div className="tooltip-box">
       <div className="tooltip-hour">{d.label}</div>
-      <div className="tooltip-prob">{d.probability}% імовірність</div>
-      <div className="tooltip-count">{d.count} тривог за місяць</div>
+      <div className="tooltip-row">
+        <span className="tooltip-label">Імовірність</span>
+        <span className="tooltip-value accent">{(d.probability * 100).toFixed(1)}%</span>
+      </div>
+      <div className="tooltip-row">
+        <span className="tooltip-label">Тривог за місяць</span>
+        <span className="tooltip-value">{d.totalAlerts}</span>
+      </div>
+      <div className="tooltip-row">
+        <span className="tooltip-label">Серед. тривалість</span>
+        <span className="tooltip-value">{d.avgDuration} хв</span>
+      </div>
     </div>
   )
 }
 
-export default function HourlyChart({ data }) {
+export function HourlyChart({ data }) {
+  const maxProb = Math.max(...data.map((d) => d.probability))
+
   return (
     <div className="chart-card">
       <div className="chart-header">
-        <h2>Імовірність тривоги по годинах доби</h2>
-        <span className="chart-sub">За останній місяць · Вишгородський р-н</span>
+        <div>
+          <h2 className="chart-title">Імовірність тривоги по годинах</h2>
+          <p className="chart-subtitle">За останні 30 днів · Вишгородський р-н</p>
+        </div>
+        <div className="legend">
+          <span className="legend-dot high" />
+          <span className="legend-text">Зона ризику (&gt;20%)</span>
+        </div>
       </div>
+
       <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fill: '#8899aa', fontSize: 11, fontFamily: 'inherit' }}
+            tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }}
             tickLine={false}
             axisLine={false}
             interval={2}
           />
           <YAxis
-            tickFormatter={v => `${v}%`}
-            tick={{ fill: '#8899aa', fontSize: 11, fontFamily: 'inherit' }}
+            tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+            tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
             tickLine={false}
             axisLine={false}
-            domain={[0, 100]}
+            domain={[0, Math.min(maxProb * 1.2, 1)]}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+          <ReferenceLine
+            y={0.2}
+            stroke="var(--danger)"
+            strokeDasharray="6 3"
+            strokeOpacity={0.6}
+            label={{
+              value: '20%',
+              fill: 'var(--danger)',
+              fontSize: 10,
+              fontFamily: 'var(--font-mono)',
+              position: 'insideTopRight',
+            }}
+          />
           <Bar dataKey="probability" radius={[3, 3, 0, 0]} maxBarSize={28}>
             {data.map((entry, index) => (
               <Cell
                 key={index}
                 fill={
-                  entry.probability > 60
-                    ? '#ff4d4d'
-                    : entry.probability > 30
-                    ? '#ff944d'
-                    : entry.probability > 10
-                    ? '#ffcc4d'
-                    : '#2a4060'
+                  entry.probability >= 0.2
+                    ? 'var(--accent-high)'
+                    : entry.probability >= 0.1
+                    ? 'var(--accent-mid)'
+                    : 'var(--accent-low)'
                 }
-                fillOpacity={0.9}
+                fillOpacity={0.85}
               />
             ))}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      <div className="legend-row">
-        <span className="legend-item"><span className="dot" style={{background:'#ff4d4d'}}/>{'> 60% — критично'}</span>
-        <span className="legend-item"><span className="dot" style={{background:'#ff944d'}}/>{'30–60% — небезпечно'}</span>
-        <span className="legend-item"><span className="dot" style={{background:'#ffcc4d'}}/>{'10–30% — помірно'}</span>
-        <span className="legend-item"><span className="dot" style={{background:'#2a4060'}}/>{'< 10% — спокійно'}</span>
+
+      <div className="hour-zones">
+        <span className="zone">🌙 Нічний пік: 02:00–05:00</span>
+        <span className="zone">🌅 Ранковий: 08:00–10:00</span>
+        <span className="zone">🌆 Вечірній: 18:00–20:00</span>
       </div>
     </div>
   )
