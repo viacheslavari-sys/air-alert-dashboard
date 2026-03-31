@@ -4,7 +4,6 @@ const RAION_NAME = 'Вишгородський район'
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
@@ -34,35 +33,35 @@ module.exports = async function handler(req, res) {
       },
     })
 
+    const text = await upstream.text()
+
     if (!upstream.ok) {
-      const text = await upstream.text()
       return res.status(upstream.status).json({
-        error: `alerts.in.ua повернув ${upstream.status}`,
+        error: `alerts.in.ua: ${upstream.status}`,
         detail: text,
       })
     }
 
-    const raw = await upstream.json()
+    const raw = JSON.parse(text)
 
-    // Фільтруємо по Вишгородському р-ну
     if (type === 'history') {
       const all = Array.isArray(raw?.alerts) ? raw.alerts : []
       const filtered = all.filter(a =>
         a.location_type === 'oblast' ||
         a.location_raion === RAION_NAME
       )
-      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=60')
+      res.setHeader('Cache-Control', 'public, s-maxage=300')
       return res.status(200).json({
-        alerts     : filtered,
-        total      : filtered.length,
-        fetched_at : new Date().toISOString(),
+        alerts    : filtered,
+        total     : filtered.length,
+        fetched_at: new Date().toISOString(),
       })
     }
 
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=30')
+    res.setHeader('Cache-Control', 'public, s-maxage=60')
     return res.status(200).json(raw)
 
   } catch (err) {
-    return res.status(502).json({ error: err.message })
+    return res.status(502).json({ error: String(err) })
   }
 }
