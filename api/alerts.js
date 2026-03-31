@@ -1,11 +1,9 @@
-const API_BASE   = 'https://api.alerts.in.ua/v1'
+const API_BASE = 'https://api.alerts.in.ua/v1'
 const OBLAST_UID = 14
 
-// Фільтруємо по location_title та location_uid
-// Вишгородський район — визначаємо за назвою (надійніше ніж UID)
 const TARGET_TITLES = [
   'Вишгородський район',
-  'Київська область',   // обласні тривоги стосуються всіх районів
+  'Київська область',
 ]
 
 module.exports = async function handler(req, res) {
@@ -52,21 +50,7 @@ module.exports = async function handler(req, res) {
 
     if (type === 'history') {
       const all = Array.isArray(raw?.alerts) ? raw.alerts : []
-
-      // DEBUG режим — показує всі унікальні райони
-      if (req.query.debug === '1') {
-        const titles = [...new Set(all.map(a => a.location_title))].sort()
-        return res.status(200).json({
-          total_raw: all.length,
-          all_titles: titles,
-          sample: all.slice(0, 2),
-        })
-      }
-
-      // Фільтруємо по location_title
-      const filtered = all.filter(a =>
-        TARGET_TITLES.includes(a.location_title)
-      )
+      const filtered = all.filter(a => TARGET_TITLES.includes(a.location_title))
 
       res.setHeader('Cache-Control', 'public, s-maxage=300')
       return res.status(200).json({
