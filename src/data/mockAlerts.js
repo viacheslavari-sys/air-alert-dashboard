@@ -144,58 +144,68 @@ export function computeSummaryStats(alerts) {
  * Імовірність = кількість тижнів де була тривога в цей слот / загальна кількість тижнів.
  */
 export function computeHeatmap(alerts) {
-  // Скільки унікальних тижнів у даних
-  const weekSet = new Set()
-  alerts.forEach(a => {
-    const d = new Date(a.started_at)
-    // ISO-тиждень як ключ
-    const jan4 = new Date(d.getFullYear(), 0, 4)
-    const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7)
-    weekSet.add(`${d.getFullYear()}-W${week}`)
-  })
-  const totalWeeks = Math.max(weekSet.size, 1)
+  const now   = new Date()
+  const since = new Date(now)
+  since.setDate(since.getDate() - 30)
 
-  // Матриця hits[dayOfWeek][hour] = кількість унікальних тижнів з тривогою
-  const hits = Array.from({ length: 7 }, () => Array(24).fill(0))
-  const slotWeeks = Array.from({ length: 7 }, () =>
+  // Скільки разів кожен день тижня зустрічається за останні 30 днів
+  const dowTotals = Array(7).fill(0)
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i)
+    dowTotals[(d.getDay() + 6) % 7]++
+  }
+
+  // Для кожного слоту [dow][hour] — кількість унікальних дат з тривогою
+  const slotDays = Array.from({ length: 7 }, () =>
     Array.from({ length: 24 }, () => new Set())
   )
+  // Для кожного дня тижня — кількість дат з хоча б однією тривогою
+  const dowDays = Array.from({ length: 7 }, () => new Set())
 
   alerts.forEach(a => {
-    const d = new Date(a.started_at)
-    // JS: 0=Нд, перетворюємо на 0=Пн
-    const dow = (d.getDay() + 6) % 7
-    const hour = d.getHours()
-    const jan4 = new Date(d.getFullYear(), 0, 4)
-    const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7)
-    slotWeeks[dow][hour].add(`${d.getFullYear()}-W${week}`)
+    const d       = new Date(a.started_at)
+    const dow     = (d.getDay() + 6) % 7
+    const hour    = d.getHours()
+    const dateKey = a.started_at.slice(0, 10)
+    slotDays[dow][hour].add(dateKey)
+    dowDays[dow].add(dateKey)
   })
 
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 
+  const dayStats = DAY_LABELS.map((day, dow) => ({
+    day,
+    dow,
+    daysWithAlert: dowDays[dow].size,
+    totalDays    : dowTotals[dow],
+    probability  : dowDays[dow].size / Math.max(dowTotals[dow], 1),
+  }))
+
+  const quietestDow = dayStats.reduce(
+    (min, s) => s.probability < min.probability ? s : min,
+    dayStats[0]
+  ).dow
+
   return {
-    totalWeeks,
+    periodFrom : since.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }),
+    periodTo   : now.toLocaleDateString('uk-UA',   { day: 'numeric', month: 'short' }),
+    dowTotals,
+    dayStats,
+    quietestDow,
     cells: DAY_LABELS.map((day, dow) =>
       Array.from({ length: 24 }, (_, hour) => ({
         day,
         dow,
         hour,
-        label: `${String(hour).padStart(2, '0')}:00`,
-        count: slotWeeks[dow][hour].size,
-        probability: slotWeeks[dow][hour].size / totalWeeks,
+        label      : `${String(hour).padStart(2, '0')}:00`,
+        count      : slotDays[dow][hour].size,
+        probability: slotDays[dow][hour].size / Math.max(dowTotals[dow], 1),
       }))
     ),
   }
 }
 
-/**
- * Прогноз на наступні N годин на основі статистики.
- * Для кожної майбутньої години повертає:
- *   - базову імовірність (з теплової карти)
- *   - скориговану імовірність з урахуванням інтервалу після останньої тривоги
- *   - довірчий інтервал (±1σ на основі бінарної дисперсії)
- */
-export function computeForecast(alerts, hoursAhead = 6) {
   const heatmap = computeHeatmap(alerts)
 
   // Час останньої тривоги
