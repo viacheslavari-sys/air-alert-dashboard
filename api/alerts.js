@@ -46,6 +46,18 @@ module.exports = async function handler(req, res) {
 
     if (type === 'history') {
       const all = Array.isArray(raw?.alerts) ? raw.alerts : []
+
+      // DEBUG: повертаємо сирі дані щоб побачити структуру
+      const debug = req.query.debug === '1'
+      if (debug) {
+        return res.status(200).json({
+          total_raw: all.length,
+          sample: all.slice(0, 3),
+          unique_location_types: [...new Set(all.map(a => a.location_type))],
+          unique_raions: [...new Set(all.map(a => a.location_raion).filter(Boolean))].slice(0, 10),
+        })
+      }
+
       const filtered = all.filter(a =>
         a.location_type === 'oblast' ||
         a.location_raion === RAION_NAME
