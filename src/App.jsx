@@ -3,33 +3,47 @@ import { HourlyChart } from './components/HourlyChart'
 import { DurationChart } from './components/DurationChart'
 import { StatsCards } from './components/StatsCards'
 
+const REGIONS = {
+  kyiv    : { label: 'Вишгородський р-н', sub: 'Київська обл.' },
+  zhytomyr: { label: 'Житомирський р-н',  sub: 'Житомирська обл.' },
+}
+
+function RegionBlock({ regionKey, data, label, sub }) {
+  if (!data) return null
+  return (
+    <div className="region-block">
+      <div className="region-heading">
+        <span className="region-label">{label}</span>
+        <span className="region-sub">{sub}</span>
+      </div>
+      <StatsCards stats={data.stats} />
+      <HourlyChart data={data.hourlyData} />
+      <DurationChart hourlyData={data.hourlyData} dailyData={data.dailyData} />
+    </div>
+  )
+}
+
 export default function App() {
-  const { loading, error, hourlyData, dailyData, stats, isMock } = useAlertsData()
+  const { loading, error, isMock, kyiv, zhytomyr } = useAlertsData()
 
   return (
     <div className="app">
-      {/* Subtle grid background */}
       <div className="bg-grid" aria-hidden="true" />
 
       <header className="header">
         <div className="header-left">
           <div className="header-badge">
             <span className="badge-dot" />
-            <span className="badge-text">
-              {isMock ? 'ДЕМО-ДАНІ' : 'LIVE'}
-            </span>
+            <span className="badge-text">{isMock ? 'ДЕМО-ДАНІ' : 'LIVE'}</span>
           </div>
           <div>
             <h1 className="header-title">
               <span className="title-icon">⚠</span>
               Аналітика тривог
             </h1>
-            <p className="header-sub">
-              Вишгородський р-н · Київська обл · 30 днів
-            </p>
+            <p className="header-sub">Порівняння регіонів · 30 днів</p>
           </div>
         </div>
-
         <div className="header-right">
           <div className="data-source">
             <span className="ds-label">Джерело</span>
@@ -52,34 +66,41 @@ export default function App() {
           </div>
         )}
 
-        {error && isMock && (
+        {error && (
           <div className="notice notice--warn">
-            <span>⚠ API недоступне — показано демо-дані з реалістичними патернами</span>
+            <div>⚠ API недоступне — показано демо-дані</div>
+            <code style={{ fontSize: '11px', opacity: 0.7, display: 'block', marginTop: '6px' }}>
+              {error}
+            </code>
           </div>
         )}
 
         {isMock && !error && (
           <div className="notice notice--info">
-            <span>
-              ℹ Показано моделювання на основі статистичних патернів Київщини 2023–2024.
-              Додайте <code>ALERTS_TOKEN</code> у Vercel для реальних даних.
-            </span>
+            ℹ Показано моделювання на основі статистичних патернів 2023–2024.
           </div>
         )}
 
         {!loading && (
-          <>
-            <StatsCards stats={stats} />
-            <HourlyChart data={hourlyData} />
-            <DurationChart hourlyData={hourlyData} dailyData={dailyData} />
-          </>
+          <div className="comparison-grid">
+            <RegionBlock
+              regionKey="kyiv"
+              data={kyiv}
+              label={REGIONS.kyiv.label}
+              sub={REGIONS.kyiv.sub}
+            />
+            <RegionBlock
+              regionKey="zhytomyr"
+              data={zhytomyr}
+              label={REGIONS.zhytomyr.label}
+              sub={REGIONS.zhytomyr.sub}
+            />
+          </div>
         )}
       </main>
 
       <footer className="footer">
         <span>Дані: alerts.in.ua API</span>
-        <span>·</span>
-        <span>Регіон ID: 31 (Київська обл.)</span>
         <span>·</span>
         <span>React + Vite + Recharts</span>
       </footer>
