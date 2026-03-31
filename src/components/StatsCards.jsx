@@ -22,7 +22,7 @@ function StatCard({ label, values, unit, icon }) {
           </div>
         ) : (
           <div className="stat-value">
-            {values[0]?.value}
+            {values[0] ? values[0].value : null}
             <span className="stat-unit">{unit}</span>
           </div>
         )}

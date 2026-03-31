@@ -7,23 +7,42 @@ import { ForecastChart } from './components/ForecastChart'
 import { TopSlotsChart } from './components/TopSlotsChart'
 import { DurationChart } from './components/DurationChart'
 
+function buildMaps(regionKeys, dataMap) {
+  const statsMap  = {}
+  const alertsMap = {}
+  const hourlyMap = {}
+  const dailyMap  = {}
+
+  regionKeys.forEach(function(k) {
+    const d = dataMap[k]
+    if (!d) return
+    statsMap[k]  = d.stats       || null
+    alertsMap[k] = d.alerts      || []
+    hourlyMap[k] = d.hourlyData  || []
+    dailyMap[k]  = d.dailyData   || []
+  })
+
+  return { statsMap, alertsMap, hourlyMap, dailyMap }
+}
+
 export default function App() {
   const { loading, error, isMock, kyiv, zhytomyr } = useAlertsData()
   const [selectedRegions, setSelectedRegions] = useState(['kyiv'])
 
-  const dataMap      = { kyiv, zhytomyr }
-  const activeRegions = selectedRegions.filter(k => dataMap[k])
+  const dataMap = { kyiv: kyiv, zhytomyr: zhytomyr }
 
-  const statsMap   = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.stats]))
-  const alertsMap  = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.alerts ?? []]))
-  const hourlyMap  = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.hourlyData ?? []]))
-  const dailyMap   = Object.fromEntries(activeRegions.map(k => [k, dataMap[k]?.dailyData ?? []]))
+  const activeRegions = selectedRegions.filter(function(k) {
+    return dataMap[k] != null
+  })
 
-  const regionLabel = activeRegions.length === 1
-    ? activeRegions[0] === 'kyiv'
+  const { statsMap, alertsMap, hourlyMap, dailyMap } = buildMaps(activeRegions, dataMap)
+
+  let regionLabel = 'Порівняння регіонів'
+  if (activeRegions.length === 1) {
+    regionLabel = activeRegions[0] === 'kyiv'
       ? 'Вишгородський р-н · Київська обл.'
       : 'Житомирський р-н · Житомирська обл.'
-    : 'Порівняння регіонів'
+  }
 
   return (
     <div className="app">

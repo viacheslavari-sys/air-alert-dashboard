@@ -22,7 +22,7 @@ function seededRandom(seed) {
     s = (s * 1664525 + 1013904223) & 0xffffffff
     return (s >>> 0) / 0xffffffff
   }
-}и
+}
 
 export function generateMockAlerts() {
   const rand = seededRandom(20240301)
@@ -275,5 +275,5 @@ export function computeForecast(alerts, hoursAhead = 6) {
     })
   }
 
-  return { slots, avgIntervalHours, lastAlert: lastAlert?.toISOString() ?? null }
+  return { slots, avgIntervalHours, lastAlert: lastAlert ? lastAlert.toISOString() : null }
 }

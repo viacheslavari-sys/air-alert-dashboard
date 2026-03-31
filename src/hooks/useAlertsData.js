@@ -9,7 +9,7 @@ import {
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
 function normalizeAlerts(raw) {
-  const list = Array.isArray(raw?.alerts) ? raw.alerts : []
+  const list = Array.isArray(raw && raw.alerts) ? raw.alerts : []
   return list.map(a => ({
     id              : a.id,
     started_at      : a.started_at,

@@ -62,7 +62,7 @@ export function DurationChart({ dataMap, dailyDataMap, regionKeys }) {
     .map((d, i) => {
       const row = { label: d.label }
       regionKeys.forEach(k => {
-        row['avg_' + k] = (dataMap[k] || [])[i]?.avgDuration || 0
+        row['avg_' + k] = ((dataMap[k] || [])[i] || {}).avgDuration || 0
       })
       return row
     })
@@ -73,7 +73,7 @@ export function DurationChart({ dataMap, dailyDataMap, regionKeys }) {
       shortDate: new Date(d.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'numeric' }),
     }
     regionKeys.forEach(k => {
-      row['count_' + k] = (dailyDataMap[k] || [])[i]?.count || 0
+      row['count_' + k] = ((dailyDataMap[k] || [])[i] || {}).count || 0
     })
     return row
   })
