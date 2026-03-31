@@ -1,7 +1,7 @@
 import { computeHeatmap } from '../data/mockAlerts'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell, LabelList,
+  Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 
 const REGION_COLORS = {
@@ -34,76 +34,78 @@ function SlotTooltip({ active, payload }) {
   )
 }
 
-function pctFormatter(v) {
-  if (!v || v <= 0) return ''
-  return `${(v * 100).toFixed(0)}%`
-}
-
-function getTopSlots(alerts, n = 8) {
-  const { cells, dowTotals } = computeHeatmap(alerts)
+function getTopSlots(alerts, n) {
+  const hm = computeHeatmap(alerts)
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 
-  const flat = cells.flatMap((dayCells, dow) =>
+  const flat = hm.cells.flatMap((dayCells, dow) =>
     dayCells.map(cell => ({
-      key       : `${dow}-${cell.hour}`,
-      fullLabel : `${DAY_LABELS[dow]}, ${cell.label}`,
-      label     : `${DAY_LABELS[dow]} ${String(cell.hour).padStart(2, '0')}:00`,
+      key       : dow + '-' + cell.hour,
+      fullLabel : DAY_LABELS[dow] + ', ' + cell.label,
+      label     : DAY_LABELS[dow] + ' ' + String(cell.hour).padStart(2, '0') + ':00',
       probability: cell.probability,
+      pctLabel  : Math.round(cell.probability * 100) + '%',
       count     : cell.count,
-      total     : dowTotals[dow],
+      total     : hm.dowTotals[dow],
     }))
   )
 
   return flat
     .filter(s => s.probability > 0)
     .sort((a, b) => b.probability - a.probability)
-    .slice(0, n)
+    .slice(0, n || 8)
 }
 
-function getTopSlotsCompare(alertsMap, regionKeys, n = 8) {
+function getTopSlotsCompare(alertsMap, regionKeys, n) {
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
-  const maps = regionKeys.map(k => computeHeatmap(alertsMap[k]))
+  const hm0 = computeHeatmap(alertsMap[regionKeys[0]])
+  const hm1 = computeHeatmap(alertsMap[regionKeys[1]])
 
-  const flat = maps[0].cells.flatMap((dayCells, dow) =>
+  const flat = hm0.cells.flatMap((dayCells, dow) =>
     dayCells.map((cell, hour) => {
       const p0 = cell.probability
-      const p1 = maps[1].cells[dow][hour].probability
-      return {
-        key      : `${dow}-${hour}`,
-        label    : `${DAY_LABELS[dow]} ${String(hour).padStart(2, '0')}:00`,
-        fullLabel: `${DAY_LABELS[dow]}, ${String(hour).padStart(2, '0')}:00`,
+      const p1 = hm1.cells[dow][hour].probability
+      const row = {
+        key      : dow + '-' + hour,
+        label    : DAY_LABELS[dow] + ' ' + String(hour).padStart(2, '0') + ':00',
+        fullLabel: DAY_LABELS[dow] + ', ' + String(hour).padStart(2, '0') + ':00',
         avgProb  : (p0 + p1) / 2,
         count    : cell.count,
-        total    : maps[0].dowTotals[dow],
-        [`prob_${regionKeys[0]}`]: p0,
-        [`prob_${regionKeys[1]}`]: p1,
+        total    : hm0.dowTotals[dow],
       }
+      row['prob_' + regionKeys[0]] = p0
+      row['prob_' + regionKeys[1]] = p1
+      return row
     })
   )
 
   return flat
     .filter(s => s.avgProb > 0)
     .sort((a, b) => b.avgProb - a.avgProb)
-    .slice(0, n)
+    .slice(0, n || 8)
 }
 
 export function TopSlotsChart({ alertsMap, regionKeys }) {
   const isCompare = regionKeys.length === 2
+  const n = 8
 
   const chartData = isCompare
-    ? getTopSlotsCompare(alertsMap, regionKeys)
-    : getTopSlots(alertsMap[regionKeys[0]])
+    ? getTopSlotsCompare(alertsMap, regionKeys, n)
+    : getTopSlots(alertsMap[regionKeys[0]], n)
 
-  const labelStyle = { fill: '#8899aa', fontSize: 11 }
+  const maxProb = Math.max(
+    ...chartData.map(d => isCompare
+      ? Math.max(d['prob_' + regionKeys[0]] || 0, d['prob_' + regionKeys[1]] || 0)
+      : (d.probability || 0)
+    ), 0.1
+  )
 
   return (
     <div className="chart-card">
       <div className="chart-header">
         <div>
           <h2 className="chart-title">Найнебезпечніші слоти</h2>
-          <p className="chart-subtitle">
-            Топ-8 комбінацій день+година · за імовірністю тривоги
-          </p>
+          <p className="chart-subtitle">Топ-8 комбінацій день+година</p>
         </div>
         {isCompare && (
           <div className="legend">
@@ -124,18 +126,14 @@ export function TopSlotsChart({ alertsMap, regionKeys }) {
           margin={{ top: 4, right: 52, left: 8, bottom: 0 }}
           barGap={3}
         >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="rgba(255,255,255,0.05)"
-            horizontal={false}
-          />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
           <XAxis
             type="number"
-            tickFormatter={v => `${(v * 100).toFixed(0)}%`}
+            tickFormatter={v => Math.round(v * 100) + '%'}
             tick={{ fill: '#8899aa', fontSize: 11 }}
             tickLine={false}
             axisLine={false}
-            domain={[0, 'auto']}
+            domain={[0, Math.min(maxProb * 1.15, 1)]}
           />
           <YAxis
             type="category"
@@ -151,20 +149,13 @@ export function TopSlotsChart({ alertsMap, regionKeys }) {
             regionKeys.map(k => (
               <Bar
                 key={k}
-                dataKey={`prob_${k}`}
+                dataKey={'prob_' + k}
                 name={REGION_NAMES[k]}
                 fill={REGION_COLORS[k]}
                 radius={[0, 4, 4, 0]}
                 maxBarSize={14}
                 fillOpacity={0.85}
-              >
-                <LabelList
-                  dataKey={`prob_${k}`}
-                  position="right"
-                  formatter={pctFormatter}
-                  style={{ ...labelStyle, fill: REGION_COLORS[k] }}
-                />
-              </Bar>
+              />
             ))
           ) : (
             <Bar
@@ -173,21 +164,13 @@ export function TopSlotsChart({ alertsMap, regionKeys }) {
               maxBarSize={22}
               fillOpacity={0.85}
             >
-              <LabelList
-                dataKey="probability"
-                position="right"
-                formatter={pctFormatter}
-                style={labelStyle}
-              />
               {chartData.map((entry, i) => (
                 <Cell
                   key={i}
                   fill={
-                    entry.probability >= 0.5
-                      ? '#ef4444'
-                      : entry.probability >= 0.3
-                      ? '#f97316'
-                      : '#3b82f6'
+                    entry.probability >= 0.5 ? '#ef4444'
+                    : entry.probability >= 0.3 ? '#f97316'
+                    : '#3b82f6'
                   }
                 />
               ))}
@@ -198,7 +181,7 @@ export function TopSlotsChart({ alertsMap, regionKeys }) {
 
       <p className="hm-note">
         Відсоток = частка відповідних днів у яких тривога починалась саме в цю годину.
-        {isCompare && ' Відсортовано за середньою імовірністю між регіонами.'}
+        {isCompare && ' Відсортовано за середньою між регіонами.'}
       </p>
     </div>
   )

@@ -84,7 +84,7 @@ export function DurationChart({ dataMap, dailyDataMap, regionKeys }) {
             <Tooltip content={<DurationTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
             {isCompare && <Legend formatter={v => v} wrapperStyle={{ paddingTop: 8 }} />}
             {regionKeys.map(k => (
-              <Bar key={k} dataKey={`avg_${k}`} name={REGION_COLORS[k].name}
+              <Bar key={k} dataKey={"avg_" + k} name={REGION_COLORS[k].name}
                    fill={REGION_COLORS[k].bar} radius={[3,3,0,0]} maxBarSize={isCompare ? 14 : 24} fillOpacity={0.8} />
             ))}
           </BarChart>
@@ -102,7 +102,7 @@ export function DurationChart({ dataMap, dailyDataMap, regionKeys }) {
           <AreaChart data={dailyMerged} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
             <defs>
               {regionKeys.map(k => (
-                <linearGradient key={k} id={`grad_${k}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient key={k} id={"grad_" + k} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor={REGION_COLORS[k].area} stopOpacity={0.35} />
                   <stop offset="95%" stopColor={REGION_COLORS[k].area} stopOpacity={0.02} />
                 </linearGradient>
@@ -114,9 +114,9 @@ export function DurationChart({ dataMap, dailyDataMap, regionKeys }) {
             <Tooltip content={<DailyTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
             {isCompare && <Legend formatter={v => v} wrapperStyle={{ paddingTop: 8 }} />}
             {regionKeys.map(k => (
-              <Area key={k} type="monotone" dataKey={`count_${k}`} name={REGION_COLORS[k].name}
+              <Area key={k} type="monotone" dataKey={"count_" + k} name={REGION_COLORS[k].name}
                     stroke={REGION_COLORS[k].area} strokeWidth={2}
-                    fill={`url(#grad_${k})`} dot={false}
+                    fill={"url(#grad_" + k + ")"} dot={false}
                     activeDot={{ r: 4, fill: REGION_COLORS[k].area, strokeWidth: 0 }} />
             ))}
           </AreaChart>
