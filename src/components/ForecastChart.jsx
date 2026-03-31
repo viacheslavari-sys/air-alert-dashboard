@@ -15,23 +15,27 @@ const REGION_NAMES = {
 }
 
 function ForecastTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null
-  const d = payload[0]?.payload
+  if (!active || !payload || !payload.length) return null
+  const row = payload[0] && payload[0].payload ? payload[0].payload : {}
+
   return (
     <div className="tooltip-box">
-      <div className="tooltip-hour">{d?.fullLabel}</div>
-      {payload.map(p => (
-        <div className="tooltip-row" key={p.dataKey}>
-          <span className="tooltip-label" style={{ color: p.fill }}>{p.name}</span>
-          <span className="tooltip-value accent">{(p.value * 100).toFixed(1)}%</span>
-        </div>
-      ))}
-      {payload[0] && (
+      <div className="tooltip-hour">{row.fullLabel || ''}</div>
+      {payload.map(function(p) {
+        return (
+          <div className="tooltip-row" key={p.name}>
+            <span className="tooltip-label" style={{ color: p.fill }}>{p.name}</span>
+            <span className="tooltip-value accent">
+              {p.value ? (p.value * 100).toFixed(1) + '%' : '—'}
+            </span>
+          </div>
+        )
+      })}
+      {row.ciLo != null && (
         <div className="tooltip-row">
           <span className="tooltip-label">90% інтервал</span>
           <span className="tooltip-value">
-            {(payload[0].payload[`ci_lo_${payload[0].dataKey.replace('prob_','')}`] * 100).toFixed(0)}–
-            {(payload[0].payload[`ci_hi_${payload[0].dataKey.replace('prob_','')}`] * 100).toFixed(0)}%
+            {Math.round(row.ciLo * 100)}–{Math.round(row.ciHi * 100)}%
           </span>
         </div>
       )}
@@ -43,22 +47,25 @@ export function ForecastChart({ alertsMap, regionKeys }) {
   const isCompare = regionKeys.length === 2
 
   const forecasts = {}
-  regionKeys.forEach(k => {
+  regionKeys.forEach(function(k) {
     forecasts[k] = computeForecast(alertsMap[k], 6)
   })
 
   const primarySlots = forecasts[regionKeys[0]].slots
 
-  const data = primarySlots.map((slot, i) => {
+  const data = primarySlots.map(function(slot, i) {
     const row = {
       label    : slot.label,
       fullLabel: slot.fullLabel,
     }
-    regionKeys.forEach(k => {
+    regionKeys.forEach(function(k) {
       const s = forecasts[k].slots[i]
-      row['prob_' + k]  = s.adjustedProbability
-      row['ci_lo_' + k] = s.ciLow
-      row['ci_hi_' + k] = s.ciHigh
+      row['prob_' + k] = s.adjustedProbability
+      // Store CI for primary region only (shown in tooltip)
+      if (k === regionKeys[0]) {
+        row.ciLo = s.ciLow
+        row.ciHi = s.ciHigh
+      }
     })
     return row
   })
@@ -71,25 +78,29 @@ export function ForecastChart({ alertsMap, regionKeys }) {
           <p className="chart-subtitle">Статистична імовірність · скоригована на інтервал</p>
         </div>
         {isCompare && (
-          <div className="legend">
-            {regionKeys.map(k => (
-              <span key={k} className="legend-item">
-                <span className="legend-dot" style={{ background: REGION_COLORS[k] }} />
-                <span className="legend-text">{REGION_NAMES[k]}</span>
-              </span>
-            ))}
+          <div className="chart-legend-row">
+            {regionKeys.map(function(k) {
+              return (
+                <span key={k} className="legend-item">
+                  <span className="legend-dot" style={{ background: REGION_COLORS[k] }} />
+                  <span className="legend-text">{REGION_NAMES[k]}</span>
+                </span>
+              )
+            })}
           </div>
         )}
       </div>
 
-      {regionKeys.map(k => forecasts[k].avgIntervalHours).filter(Boolean).length > 0 && (
+      {regionKeys.some(function(k) { return forecasts[k].avgIntervalHours }) && (
         <div className="forecast-meta">
-          {regionKeys.map(k => {
+          {regionKeys.map(function(k) {
             const f = forecasts[k]
             if (!f.avgIntervalHours) return null
             return (
               <span key={k}>
-                {isCompare && <span style={{ color: REGION_COLORS[k] }}>{REGION_NAMES[k]}: </span>}
+                {isCompare && (
+                  <span style={{ color: REGION_COLORS[k] }}>{REGION_NAMES[k]}: </span>
+                )}
                 інтервал <strong>{f.avgIntervalHours.toFixed(1)} год</strong>
               </span>
             )
@@ -107,7 +118,7 @@ export function ForecastChart({ alertsMap, regionKeys }) {
             axisLine={false}
           />
           <YAxis
-            tickFormatter={v => `${(v * 100).toFixed(0)}%`}
+            tickFormatter={function(v) { return Math.round(v * 100) + '%' }}
             tick={{ fill: '#8899aa', fontSize: 11 }}
             tickLine={false}
             axisLine={false}
@@ -116,17 +127,19 @@ export function ForecastChart({ alertsMap, regionKeys }) {
           <ReferenceLine y={0.2} stroke="#ef4444" strokeDasharray="6 3" strokeOpacity={0.5} />
 
           {isCompare ? (
-            regionKeys.map(k => (
-              <Bar
-                key={k}
-                dataKey={'prob_' + k}
-                name={REGION_NAMES[k]}
-                fill={REGION_COLORS[k]}
-                radius={[4, 4, 0, 0]}
-                maxBarSize={22}
-                fillOpacity={0.85}
-              />
-            ))
+            regionKeys.map(function(k) {
+              return (
+                <Bar
+                  key={k}
+                  dataKey={'prob_' + k}
+                  name={REGION_NAMES[k]}
+                  fill={REGION_COLORS[k]}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={22}
+                  fillOpacity={0.85}
+                />
+              )
+            })
           ) : (
             <Bar
               dataKey={'prob_' + regionKeys[0]}
@@ -135,16 +148,15 @@ export function ForecastChart({ alertsMap, regionKeys }) {
               maxBarSize={48}
               fillOpacity={0.85}
             >
-              {data.map((entry, i) => (
-                <Cell
-                  key={i}
-                  fill={
-                    entry['prob_' + regionKeys[0]] >= 0.35 ? '#ef4444'
-                    : entry['prob_' + regionKeys[0]] >= 0.2 ? '#f97316'
-                    : '#3b82f6'
-                  }
-                />
-              ))}
+              {data.map(function(entry, i) {
+                const prob = entry['prob_' + regionKeys[0]] || 0
+                return (
+                  <Cell
+                    key={i}
+                    fill={prob >= 0.35 ? '#ef4444' : prob >= 0.2 ? '#f97316' : '#3b82f6'}
+                  />
+                )
+              })}
             </Bar>
           )}
         </BarChart>
@@ -153,7 +165,6 @@ export function ForecastChart({ alertsMap, regionKeys }) {
       <p className="hm-note">
         Скоригована імовірність враховує час з останньої тривоги відносно середнього інтервалу.
         Засновано виключно на статистиці за 30 днів — не є оперативним прогнозом.
-        Наведіть на стовпчик для 90% довірчого інтервалу.
       </p>
     </div>
   )
