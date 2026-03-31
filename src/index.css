@@ -691,3 +691,34 @@ body {
   letter-spacing: -0.03em;
   color: var(--text);
 }
+
+/* ── Heatmap: day % column and quiet row ── */
+.hm-pct-label {
+  width: 38px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: right;
+  padding-right: 6px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.hm-row--quiet {
+  background: rgba(74, 222, 128, 0.04);
+  border-radius: 4px;
+}
+
+.hm-quiet-badge {
+  font-size: 8px;
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  border-radius: 3px;
+  padding: 1px 4px;
+  letter-spacing: 0.03em;
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
