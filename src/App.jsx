@@ -5,6 +5,7 @@ import { StatsCards } from './components/StatsCards'
 import { HeatmapChart } from './components/HeatmapChart'
 import { ForecastChart } from './components/ForecastChart'
 import { TopSlotsChart } from './components/TopSlotsChart'
+import { SafeWindowFinder } from './components/SafeWindowFinder'
 import { DurationChart } from './components/DurationChart'
 
 function buildMaps(regionKeys, dataMap) {
@@ -26,7 +27,7 @@ function buildMaps(regionKeys, dataMap) {
 }
 
 export default function App() {
-  const { loading, error, isMock, kyiv, zhytomyr } = useAlertsData()
+  const { loading, error, isMock, kyiv, zhytomyr, historyDays } = useAlertsData()
   const [selectedRegions, setSelectedRegions] = useState(['kyiv'])
 
   const dataMap = { kyiv: kyiv, zhytomyr: zhytomyr }
@@ -59,7 +60,7 @@ export default function App() {
               <span className="title-icon">⚠</span>
               Аналітика тривог
             </h1>
-            <p className="header-sub">{regionLabel} · 30 днів</p>
+            <p className="header-sub">{regionLabel} · {historyDays} днів</p>
           </div>
         </div>
         <div className="header-right">
@@ -105,6 +106,7 @@ export default function App() {
           <>
             <StatsCards statsMap={statsMap} regionKeys={activeRegions} />
             <HeatmapChart alertsMap={alertsMap} regionKeys={activeRegions} />
+            <SafeWindowFinder alertsMap={alertsMap} regionKeys={activeRegions} />
             <TopSlotsChart alertsMap={alertsMap} regionKeys={activeRegions} />
             <ForecastChart alertsMap={alertsMap} regionKeys={activeRegions} />
             <DurationChart
