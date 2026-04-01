@@ -8,12 +8,16 @@ import {
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
-// Raw URL до history.json у цьому ж публічному репо
-// Замініть YOUR_GITHUB_USER та YOUR_REPO_NAME на свої значення
 const HISTORY_URL = 'https://raw.githubusercontent.com/' +
   (import.meta.env.VITE_GITHUB_USER || 'YOUR_GITHUB_USER') + '/' +
   (import.meta.env.VITE_REPO_NAME   || 'YOUR_REPO_NAME')  +
   '/main/data/history.json'
+
+// Які location_title вважати релевантними для кожного регіону
+const REGION_FILTERS = {
+  kyiv    : ['Вишгородський район', 'Київська область'],
+  zhytomyr: ['Житомирський район',  'Житомирська область'],
+}
 
 function normalizeAlert(a) {
   return {
@@ -32,6 +36,13 @@ function normalizeAlert(a) {
 function normalizeAlerts(raw) {
   var list = Array.isArray(raw && raw.alerts) ? raw.alerts : []
   return list.map(normalizeAlert)
+}
+
+function filterByRegion(alerts, regionKey) {
+  var allowed = REGION_FILTERS[regionKey] || []
+  return alerts.filter(function(a) {
+    return allowed.indexOf(a.location_title) !== -1
+  })
 }
 
 async function fetchRegion(region) {
@@ -94,7 +105,6 @@ export function useAlertsData() {
     var cancelled = false
 
     async function load() {
-      // Моковий режим — без fetch
       if (USE_MOCK) {
         var ka = generateMockAlerts()
         var za = generateMockAlerts()
@@ -107,7 +117,6 @@ export function useAlertsData() {
       }
 
       try {
-        // Паралельно: свіжі 30 днів + вся накопичена історія
         var results = await Promise.all([
           fetchRegion('kyiv'),
           fetchRegion('zhytomyr'),
@@ -118,8 +127,13 @@ export function useAlertsData() {
         var zhytomyrFresh = normalizeAlerts(results[1])
         var accumulated   = results[2]
 
-        var kyivAcc     = accumulated && Array.isArray(accumulated.kyiv)     ? accumulated.kyiv     : []
-        var zhytomyrAcc = accumulated && Array.isArray(accumulated.zhytomyr) ? accumulated.zhytomyr : []
+        // Фільтруємо накопичені дані по релевантних районах
+        var kyivAcc = accumulated && Array.isArray(accumulated.kyiv)
+          ? filterByRegion(accumulated.kyiv, 'kyiv')
+          : []
+        var zhytomyrAcc = accumulated && Array.isArray(accumulated.zhytomyr)
+          ? filterByRegion(accumulated.zhytomyr, 'zhytomyr')
+          : []
 
         var kyivAll     = mergeAlerts(kyivFresh,     kyivAcc)
         var zhytomyrAll = mergeAlerts(zhytomyrFresh, zhytomyrAcc)
