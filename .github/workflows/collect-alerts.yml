@@ -2,7 +2,10 @@ name: Collect Alert History
 
 on:
   schedule:
-    - cron: '30 23 * * *'
+    - cron: '30 5  * * *'   # 08:30 Київ
+    - cron: '30 11 * * *'   # 14:30 Київ
+    - cron: '30 17 * * *'   # 20:30 Київ
+    - cron: '30 23 * * *'   # 02:30 Київ
   workflow_dispatch:
 
 jobs:
