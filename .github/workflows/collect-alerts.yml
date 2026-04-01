@@ -4,17 +4,19 @@ on:
   schedule:
     # Щодня о 23:30 UTC (02:30 за Києвом)
     - cron: '30 23 * * *'
-  workflow_dispatch:  # Дозволяє запустити вручну
+  workflow_dispatch:
 
 jobs:
   collect:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Дозвіл на запис у репо
+      contents: write
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: Fetch and merge alerts
         env:
@@ -22,26 +24,45 @@ jobs:
         run: |
           set -e
 
+          # Перевірка токена
+          if [ -z "$ALERTS_TOKEN" ]; then
+            echo "❌ ALERTS_TOKEN is not set. Add it to repo Secrets."
+            exit 1
+          fi
+
+          echo "✅ Token found, fetching data..."
+
           # ── 1. Отримати свіжі дані ────────────────────────────────────
-          echo "Fetching Vyshhorod (Kyiv oblast)..."
-          curl -sf \
+          echo "Fetching Kyiv oblast..."
+          HTTP=$(curl -s -o /tmp/kyiv_fresh.json -w "%{http_code}" \
             -H "Authorization: Bearer $ALERTS_TOKEN" \
             -H "Accept: application/json" \
-            "https://api.alerts.in.ua/v1/regions/14/alerts/month_ago.json" \
-            > /tmp/kyiv_fresh.json
+            "https://api.alerts.in.ua/v1/regions/14/alerts/month_ago.json")
+
+          if [ "$HTTP" != "200" ]; then
+            echo "❌ Kyiv fetch failed: HTTP $HTTP"
+            cat /tmp/kyiv_fresh.json
+            exit 1
+          fi
+          echo "✅ Kyiv: HTTP $HTTP"
 
           echo "Fetching Zhytomyr oblast..."
-          curl -sf \
+          HTTP=$(curl -s -o /tmp/zhytomyr_fresh.json -w "%{http_code}" \
             -H "Authorization: Bearer $ALERTS_TOKEN" \
             -H "Accept: application/json" \
-            "https://api.alerts.in.ua/v1/regions/10/alerts/month_ago.json" \
-            > /tmp/zhytomyr_fresh.json
+            "https://api.alerts.in.ua/v1/regions/10/alerts/month_ago.json")
+
+          if [ "$HTTP" != "200" ]; then
+            echo "❌ Zhytomyr fetch failed: HTTP $HTTP"
+            cat /tmp/zhytomyr_fresh.json
+            exit 1
+          fi
+          echo "✅ Zhytomyr: HTTP $HTTP"
 
           # ── 2. Злити з існуючою історією ─────────────────────────────
           node << 'NODEEOF'
           const fs = require('fs')
 
-          // Читаємо поточну історію
           let existing = { kyiv: [], zhytomyr: [] }
           try {
             existing = JSON.parse(fs.readFileSync('data/history.json', 'utf8'))
@@ -49,7 +70,6 @@ jobs:
             console.log('history.json not found, starting fresh')
           }
 
-          // Читаємо свіжі дані
           const kyivFresh     = JSON.parse(fs.readFileSync('/tmp/kyiv_fresh.json',     'utf8'))
           const zhytomyrFresh = JSON.parse(fs.readFileSync('/tmp/zhytomyr_fresh.json', 'utf8'))
 
@@ -57,17 +77,12 @@ jobs:
             const arr  = Array.isArray(existing) ? existing : []
             const list = Array.isArray(incoming.alerts) ? incoming.alerts : []
             const map  = {}
-
-            // Спочатку кладемо існуючі
-            arr.forEach(function(a) { map[a.id] = a })
-
-            // Потім свіжі — оновлюємо якщо з'явився finished_at
+            arr.forEach(function(a)  { map[a.id] = a })
             list.forEach(function(a) {
               if (!map[a.id] || (!map[a.id].finished_at && a.finished_at)) {
                 map[a.id] = a
               }
             })
-
             return Object.values(map).sort(function(a, b) {
               return new Date(b.started_at) - new Date(a.started_at)
             })
@@ -79,13 +94,12 @@ jobs:
             updated_at: new Date().toISOString(),
           }
 
-          console.log('Kyiv total alerts:     ' + result.kyiv.length)
-          console.log('Zhytomyr total alerts: ' + result.zhytomyr.length)
+          console.log('Kyiv total:     ' + result.kyiv.length)
+          console.log('Zhytomyr total: ' + result.zhytomyr.length)
 
-          // Зберігаємо
           fs.mkdirSync('data', { recursive: true })
           fs.writeFileSync('data/history.json', JSON.stringify(result))
-          console.log('Saved data/history.json')
+          console.log('✅ Saved data/history.json')
           NODEEOF
 
       - name: Commit and push
@@ -93,6 +107,5 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/history.json
-          # Комітимо тільки якщо є зміни
-          git diff --staged --quiet || git commit -m "chore: update alert history $(date -u +%Y-%m-%d)"
-          git push
+          git diff --staged --quiet && echo "No changes" || \
+            git commit -m "chore: update alert history $(date -u +%Y-%m-%d)" && git push
