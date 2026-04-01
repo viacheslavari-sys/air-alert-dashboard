@@ -2,48 +2,32 @@ import { useState } from 'react'
 import { useAlertsData } from './hooks/useAlertsData'
 import { RegionFilter } from './components/RegionFilter'
 import { StatsCards } from './components/StatsCards'
-import { HeatmapChart } from './components/HeatmapChart'
+import { HeatmapWithFinder } from './components/HeatmapWithFinder'
 import { ForecastChart } from './components/ForecastChart'
-import { TopSlotsChart } from './components/TopSlotsChart'
-import { SafeWindowFinder } from './components/SafeWindowFinder'
-import { DurationChart } from './components/DurationChart'
-
-function buildMaps(regionKeys, dataMap) {
-  const statsMap  = {}
-  const alertsMap = {}
-  const hourlyMap = {}
-  const dailyMap  = {}
-
-  regionKeys.forEach(function(k) {
-    const d = dataMap[k]
-    if (!d) return
-    statsMap[k]  = d.stats       || null
-    alertsMap[k] = d.alerts      || []
-    hourlyMap[k] = d.hourlyData  || []
-    dailyMap[k]  = d.dailyData   || []
-  })
-
-  return { statsMap, alertsMap, hourlyMap, dailyMap }
-}
 
 export default function App() {
-  const { loading, error, isMock, kyiv, zhytomyr, historyDays } = useAlertsData()
-  const [selectedRegions, setSelectedRegions] = useState(['kyiv'])
+  var _data     = useAlertsData()
+  var loading   = _data.loading
+  var error     = _data.error
+  var isMock    = _data.isMock
+  var kyiv      = _data.kyiv
+  var zhytomyr  = _data.zhytomyr
+  var historyDays = _data.historyDays
 
-  const dataMap = { kyiv: kyiv, zhytomyr: zhytomyr }
+  var _region      = useState('kyiv')
+  var selectedRegion = _region[0]
+  var setRegion      = _region[1]
 
-  const activeRegions = selectedRegions.filter(function(k) {
-    return dataMap[k] != null
-  })
+  var dataMap = { kyiv: kyiv, zhytomyr: zhytomyr }
+  var current = dataMap[selectedRegion]
 
-  const { statsMap, alertsMap, hourlyMap, dailyMap } = buildMaps(activeRegions, dataMap)
+  var regionLabel = selectedRegion === 'kyiv'
+    ? 'Вишгородський р-н · Київська обл.'
+    : 'Житомирський р-н · Житомирська обл.'
 
-  let regionLabel = 'Порівняння регіонів'
-  if (activeRegions.length === 1) {
-    regionLabel = activeRegions[0] === 'kyiv'
-      ? 'Вишгородський р-н · Київська обл.'
-      : 'Житомирський р-н · Житомирська обл.'
-  }
+  // StatsCards очікує statsMap і regionKeys — адаптуємо
+  var statsMap   = {}
+  statsMap[selectedRegion] = current ? current.stats : null
 
   return (
     <div className="app">
@@ -78,7 +62,7 @@ export default function App() {
       </header>
 
       <main className="main">
-        <RegionFilter selected={selectedRegions} onChange={setSelectedRegions} />
+        <RegionFilter selected={selectedRegion} onChange={setRegion} />
 
         {loading && (
           <div className="loading">
@@ -102,17 +86,19 @@ export default function App() {
           </div>
         )}
 
-        {!loading && activeRegions.length > 0 && (
+        {!loading && current && (
           <>
-            <StatsCards statsMap={statsMap} regionKeys={activeRegions} />
-            <HeatmapChart alertsMap={alertsMap} regionKeys={activeRegions} />
-            <SafeWindowFinder alertsMap={alertsMap} regionKeys={activeRegions} />
-            <TopSlotsChart alertsMap={alertsMap} regionKeys={activeRegions} />
-            <ForecastChart alertsMap={alertsMap} regionKeys={activeRegions} />
-            <DurationChart
-              dataMap={hourlyMap}
-              dailyDataMap={dailyMap}
-              regionKeys={activeRegions}
+            <StatsCards
+              statsMap={statsMap}
+              regionKeys={[selectedRegion]}
+            />
+            <HeatmapWithFinder
+              alerts={current.alerts}
+              regionKey={selectedRegion}
+            />
+            <ForecastChart
+              alertsMap={{ [selectedRegion]: current.alerts }}
+              regionKeys={[selectedRegion]}
             />
           </>
         )}

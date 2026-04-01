@@ -4,30 +4,20 @@ const REGION_OPTIONS = [
 ]
 
 export function RegionFilter({ selected, onChange }) {
-  function toggle(key) {
-    if (selected.includes(key)) {
-      // Не дозволяємо зняти останній
-      if (selected.length === 1) return
-      onChange(selected.filter(k => k !== key))
-    } else {
-      onChange([...selected, key])
-    }
-  }
-
   return (
     <div className="region-filter">
-      <span className="rf-label">Регіони:</span>
-      {REGION_OPTIONS.map(({ key, label, sub }) => {
-        const active = selected.includes(key)
+      <span className="rf-label">Регіон:</span>
+      {REGION_OPTIONS.map(function(opt) {
+        var active = selected === opt.key
         return (
           <button
-            key={key}
-            className={`rf-chip ${active ? 'rf-chip--active' : ''}`}
-            onClick={() => toggle(key)}
+            key={opt.key}
+            className={'rf-chip ' + (active ? 'rf-chip--active' : '')}
+            onClick={function() { onChange(opt.key) }}
             aria-pressed={active}
           >
-            <span className="rf-chip-label">{label}</span>
-            <span className="rf-chip-sub">{sub}</span>
+            <span className="rf-chip-label">{opt.label}</span>
+            <span className="rf-chip-sub">{opt.sub}</span>
           </button>
         )
       })}

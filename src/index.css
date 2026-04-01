@@ -1059,3 +1059,29 @@ body {
 }
 
 .sf-region { }
+
+/* ── Heatmap blink on hover ── */
+@keyframes hm-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.25; }
+}
+
+.hm-cell--blink {
+  animation: hm-blink 1s ease-in-out infinite;
+}
+
+.sf-tag--hovered {
+  background: rgba(74, 222, 128, 0.18);
+  border-color: rgba(74, 222, 128, 0.5);
+}
+
+.sf-results-section {
+  margin-top: 16px;
+}
+
+.sf-no-results {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 10px 0;
+}
