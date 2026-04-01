@@ -1085,3 +1085,30 @@ body {
   color: var(--text-muted);
   padding: 10px 0;
 }
+
+/* ── Toggle button for safe window finder ── */
+.sf-toggle-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
+.sf-toggle-btn:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.sf-toggle-btn--active {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.4);
+  color: #86efac;
+}
