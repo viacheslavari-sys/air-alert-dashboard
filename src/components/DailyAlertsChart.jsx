@@ -17,12 +17,13 @@ function buildDailyData(alerts) {
     byDay[day]++
   })
 
-  // Заповнюємо пропуски нулями між першим і останнім днем
+  // Заповнюємо пропуски нулями від першого дня до сьогодні
   var keys = Object.keys(byDay).sort()
   if (keys.length === 0) return []
 
   var start = new Date(keys[0])
-  var end   = new Date(keys[keys.length - 1])
+  var end   = new Date()  // завжди до сьогодні
+  end.setHours(0, 0, 0, 0)
   var rows  = []
 
   var cur = new Date(start)
