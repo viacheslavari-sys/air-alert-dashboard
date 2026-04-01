@@ -1,0 +1,98 @@
+name: Collect Alert History
+
+on:
+  schedule:
+    # Щодня о 23:30 UTC (02:30 за Києвом)
+    - cron: '30 23 * * *'
+  workflow_dispatch:  # Дозволяє запустити вручну
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Дозвіл на запис у репо
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Fetch and merge alerts
+        env:
+          ALERTS_TOKEN: ${{ secrets.ALERTS_TOKEN }}
+        run: |
+          set -e
+
+          # ── 1. Отримати свіжі дані ────────────────────────────────────
+          echo "Fetching Vyshhorod (Kyiv oblast)..."
+          curl -sf \
+            -H "Authorization: Bearer $ALERTS_TOKEN" \
+            -H "Accept: application/json" \
+            "https://api.alerts.in.ua/v1/regions/14/alerts/month_ago.json" \
+            > /tmp/kyiv_fresh.json
+
+          echo "Fetching Zhytomyr oblast..."
+          curl -sf \
+            -H "Authorization: Bearer $ALERTS_TOKEN" \
+            -H "Accept: application/json" \
+            "https://api.alerts.in.ua/v1/regions/10/alerts/month_ago.json" \
+            > /tmp/zhytomyr_fresh.json
+
+          # ── 2. Злити з існуючою історією ─────────────────────────────
+          node << 'NODEEOF'
+          const fs = require('fs')
+
+          // Читаємо поточну історію
+          let existing = { kyiv: [], zhytomyr: [] }
+          try {
+            existing = JSON.parse(fs.readFileSync('data/history.json', 'utf8'))
+          } catch (e) {
+            console.log('history.json not found, starting fresh')
+          }
+
+          // Читаємо свіжі дані
+          const kyivFresh     = JSON.parse(fs.readFileSync('/tmp/kyiv_fresh.json',     'utf8'))
+          const zhytomyrFresh = JSON.parse(fs.readFileSync('/tmp/zhytomyr_fresh.json', 'utf8'))
+
+          function merge(existing, incoming) {
+            const arr  = Array.isArray(existing) ? existing : []
+            const list = Array.isArray(incoming.alerts) ? incoming.alerts : []
+            const map  = {}
+
+            // Спочатку кладемо існуючі
+            arr.forEach(function(a) { map[a.id] = a })
+
+            // Потім свіжі — оновлюємо якщо з'явився finished_at
+            list.forEach(function(a) {
+              if (!map[a.id] || (!map[a.id].finished_at && a.finished_at)) {
+                map[a.id] = a
+              }
+            })
+
+            return Object.values(map).sort(function(a, b) {
+              return new Date(b.started_at) - new Date(a.started_at)
+            })
+          }
+
+          const result = {
+            kyiv      : merge(existing.kyiv,     kyivFresh),
+            zhytomyr  : merge(existing.zhytomyr, zhytomyrFresh),
+            updated_at: new Date().toISOString(),
+          }
+
+          console.log('Kyiv total alerts:     ' + result.kyiv.length)
+          console.log('Zhytomyr total alerts: ' + result.zhytomyr.length)
+
+          // Зберігаємо
+          fs.mkdirSync('data', { recursive: true })
+          fs.writeFileSync('data/history.json', JSON.stringify(result))
+          console.log('Saved data/history.json')
+          NODEEOF
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/history.json
+          # Комітимо тільки якщо є зміни
+          git diff --staged --quiet || git commit -m "chore: update alert history $(date -u +%Y-%m-%d)"
+          git push
