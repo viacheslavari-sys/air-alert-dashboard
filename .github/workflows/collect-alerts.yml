@@ -17,7 +17,7 @@ jobs:
         env:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-      - name: Fetch and merge alerts
+      - name: Fetch and merge alerts + save forecast
         env:
           ALERTS_TOKEN: ${{ secrets.ALERTS_TOKEN }}
         run: |
@@ -55,16 +55,25 @@ jobs:
           node << 'NODEEOF'
           const fs = require('fs')
 
-          let existing = { kyiv: [], zhytomyr: [], collection_started_at: null }
+          // ── Читаємо поточну історію ───────────────────────────────────
+          let existing = {
+            kyiv: [], zhytomyr: [],
+            forecasts: { kyiv: [], zhytomyr: [] },
+            collection_started_at: null,
+          }
           try {
             existing = JSON.parse(fs.readFileSync('data/history.json', 'utf8'))
           } catch (e) {
             console.log('history.json not found, starting fresh')
           }
+          if (!existing.forecasts) existing.forecasts = { kyiv: [], zhytomyr: [] }
+          if (!existing.forecasts.kyiv) existing.forecasts.kyiv = []
+          if (!existing.forecasts.zhytomyr) existing.forecasts.zhytomyr = []
 
           const kyivFresh     = JSON.parse(fs.readFileSync('/tmp/kyiv_fresh.json',     'utf8'))
           const zhytomyrFresh = JSON.parse(fs.readFileSync('/tmp/zhytomyr_fresh.json', 'utf8'))
 
+          // ── Злиття тривог ─────────────────────────────────────────────
           function merge(existing, incoming) {
             const arr  = Array.isArray(existing) ? existing : []
             const list = Array.isArray(incoming.alerts) ? incoming.alerts : []
@@ -80,26 +89,118 @@ jobs:
             })
           }
 
-          const now = new Date().toISOString()
+          const kyivAll     = merge(existing.kyiv,     kyivFresh)
+          const zhytomyrAll = merge(existing.zhytomyr, zhytomyrFresh)
 
-          const result = {
-            kyiv                 : merge(existing.kyiv,     kyivFresh),
-            zhytomyr             : merge(existing.zhytomyr, zhytomyrFresh),
-            // Зберігаємо дату першого запуску — не перезаписуємо якщо вже є
-            collection_started_at: existing.collection_started_at || now,
-            updated_at           : now,
+          // ── Заповнюємо had_alert для вчорашніх прогнозів ─────────────
+          function fillActuals(forecasts, alerts) {
+            const KYIV_FILTER     = ['Вишгородський район', 'Київська область']
+            const ZHYTOMYR_FILTER = ['Житомирський район',  'Житомирська область']
+
+            // Будуємо set годин коли була тривога (UTC, округлено до години)
+            const alertHours = new Set()
+            alerts.forEach(function(a) {
+              if (!a.started_at) return
+              const start = new Date(a.started_at)
+              const end   = a.finished_at ? new Date(a.finished_at) : new Date(start.getTime() + 3600000)
+              // Додаємо кожну годину під час якої тривала тривога
+              let cur = new Date(start)
+              cur.setMinutes(0, 0, 0)
+              while (cur <= end) {
+                alertHours.add(cur.toISOString().slice(0, 13))
+                cur = new Date(cur.getTime() + 3600000)
+              }
+            })
+
+            return forecasts.map(function(forecast) {
+              const slots = forecast.slots.map(function(slot) {
+                if (slot.had_alert !== null && slot.had_alert !== undefined) return slot
+                const hourKey = slot.dt.slice(0, 13)
+                const isPast  = new Date(slot.dt) < new Date()
+                return Object.assign({}, slot, {
+                  had_alert: isPast ? alertHours.has(hourKey) : null
+                })
+              })
+              return Object.assign({}, forecast, { slots: slots })
+            })
           }
 
-          // Рахуємо кількість зібраних днів
-          const startDate  = new Date(result.collection_started_at)
-          const today      = new Date()
-          const daysSince  = Math.floor((today - startDate) / 86400000)
-          result.days_collected = daysSince + 1  // +1 бо перший день теж рахується
+          existing.forecasts.kyiv     = fillActuals(existing.forecasts.kyiv,     kyivAll)
+          existing.forecasts.zhytomyr = fillActuals(existing.forecasts.zhytomyr, zhytomyrAll)
 
-          console.log('Kyiv total:      ' + result.kyiv.length)
-          console.log('Zhytomyr total:  ' + result.zhytomyr.length)
-          console.log('Collection start:' + result.collection_started_at)
-          console.log('Days collected:  ' + result.days_collected)
+          // ── Генеруємо прогноз на наступні 6 годин ────────────────────
+          // Використовуємо просту статистику по годинах з накопичених даних
+          function computeHourlyStats(alerts) {
+            const hourCount = Array(24).fill(0)
+            const hourDays  = Array.from({ length: 24 }, function() { return new Set() })
+
+            alerts.forEach(function(a) {
+              const d   = new Date(a.started_at)
+              const h   = d.getUTCHours()
+              const day = a.started_at.slice(0, 10)
+              hourDays[h].add(day)
+              hourCount[h]++
+            })
+
+            const totalDays = 30
+            return hourCount.map(function(count, h) {
+              return { hour: h, count: count, prob: hourDays[h].size / totalDays }
+            })
+          }
+
+          function makeForecast(alerts, regionKey) {
+            const stats   = computeHourlyStats(alerts)
+            const maxCount = Math.max.apply(null, stats.map(function(s) { return s.count })) || 1
+            const now     = new Date()
+            const slots   = []
+
+            for (let i = 1; i <= 6; i++) {
+              const future = new Date(now.getTime() + i * 3600000)
+              future.setMinutes(0, 0, 0)
+              const h    = future.getUTCHours()
+              const prob = stats[h].count / maxCount
+
+              slots.push({
+                dt       : future.toISOString(),
+                prob     : Math.round(prob * 100) / 100,
+                had_alert: null,
+              })
+            }
+
+            return {
+              made_at: now.toISOString(),
+              slots  : slots,
+            }
+          }
+
+          existing.forecasts.kyiv.push(makeForecast(kyivAll, 'kyiv'))
+          existing.forecasts.zhytomyr.push(makeForecast(zhytomyrAll, 'zhytomyr'))
+
+          // Тримаємо останні 90 прогнозів (90 днів)
+          if (existing.forecasts.kyiv.length > 90)
+            existing.forecasts.kyiv = existing.forecasts.kyiv.slice(-90)
+          if (existing.forecasts.zhytomyr.length > 90)
+            existing.forecasts.zhytomyr = existing.forecasts.zhytomyr.slice(-90)
+
+          // ── Зберігаємо ───────────────────────────────────────────────
+          const now = new Date().toISOString()
+          const startDate  = new Date(existing.collection_started_at || now)
+          const daysSince  = Math.floor((new Date() - startDate) / 86400000)
+
+          const result = {
+            kyiv                 : kyivAll,
+            zhytomyr             : zhytomyrAll,
+            forecasts            : existing.forecasts,
+            collection_started_at: existing.collection_started_at || now,
+            updated_at           : now,
+            days_collected       : daysSince + 1,
+          }
+
+          console.log('Kyiv total:          ' + result.kyiv.length)
+          console.log('Zhytomyr total:      ' + result.zhytomyr.length)
+          console.log('Kyiv forecasts:      ' + result.forecasts.kyiv.length)
+          console.log('Zhytomyr forecasts:  ' + result.forecasts.zhytomyr.length)
+          console.log('Days collected:      ' + result.days_collected)
 
           fs.mkdirSync('data', { recursive: true })
           fs.writeFileSync('data/history.json', JSON.stringify(result))

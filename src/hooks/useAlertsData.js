@@ -97,7 +97,7 @@ function calcHistoryDays(alerts) {
 }
 
 export function useAlertsData() {
-  var _state   = useState({ loading: true, error: null, isMock: USE_MOCK, kyiv: null, zhytomyr: null, historyDays: 30 })
+  var _state   = useState({ loading: true, error: null, isMock: USE_MOCK, kyiv: null, zhytomyr: null, historyDays: 30, forecastHistory: null })
   var state    = _state[0]
   var setState = _state[1]
 
@@ -144,12 +144,13 @@ export function useAlertsData() {
           : calcHistoryDays(kyivAll)
 
         if (!cancelled) setState({
-          loading     : false,
-          error       : null,
-          isMock      : false,
-          kyiv        : buildRegionState(kyivAll),
-          zhytomyr    : buildRegionState(zhytomyrAll),
-          historyDays : daysCollected,
+          loading        : false,
+          error          : null,
+          isMock         : false,
+          kyiv           : buildRegionState(kyivAll),
+          zhytomyr       : buildRegionState(zhytomyrAll),
+          historyDays    : daysCollected,
+          forecastHistory: accumulated && accumulated.forecasts ? accumulated.forecasts : null,
         })
       } catch (err) {
         var kf = generateMockAlerts()

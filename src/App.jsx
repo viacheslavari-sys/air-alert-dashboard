@@ -12,7 +12,8 @@ export default function App() {
   var isMock    = _data.isMock
   var kyiv      = _data.kyiv
   var zhytomyr  = _data.zhytomyr
-  var historyDays = _data.historyDays
+  var historyDays     = _data.historyDays
+  var forecastHistory = _data.forecastHistory
 
   var _region      = useState('kyiv')
   var selectedRegion = _region[0]
@@ -99,6 +100,7 @@ export default function App() {
             <ForecastChart
               alertsMap={{ [selectedRegion]: current.alerts }}
               regionKeys={[selectedRegion]}
+              forecastHistory={forecastHistory}
             />
           </>
         )}
