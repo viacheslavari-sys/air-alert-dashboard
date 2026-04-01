@@ -4,6 +4,7 @@ import { RegionFilter } from './components/RegionFilter'
 import { StatsCards } from './components/StatsCards'
 import { HeatmapWithFinder } from './components/HeatmapWithFinder'
 import { ForecastChart } from './components/ForecastChart'
+import { DailyAlertsChart } from './components/DailyAlertsChart'
 
 export default function App() {
   var _data     = useAlertsData()
@@ -101,6 +102,10 @@ export default function App() {
               alertsMap={{ [selectedRegion]: current.alerts }}
               regionKeys={[selectedRegion]}
               forecastHistory={forecastHistory}
+            />
+            <DailyAlertsChart
+              alerts={current.alerts}
+              regionKey={selectedRegion}
             />
           </>
         )}
