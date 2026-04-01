@@ -49,8 +49,8 @@ function SlotTooltip(props) {
         </div>
       )}
       <div className="tooltip-row">
-        <span className="tooltip-label">Підстава</span>
-        <span className="tooltip-value">{d.count} з {d.total} дн.</span>
+        <span className="tooltip-label">Кількість тривог</span>
+        <span className="tooltip-value">{d.count}</span>
       </div>
     </div>
   )

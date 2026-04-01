@@ -156,53 +156,77 @@ export function computeHeatmap(alerts) {
     dowTotals[(d.getDay() + 6) % 7]++
   }
 
-  // Для кожного слоту [dow][hour] — кількість унікальних дат з тривогою
-  const slotDays = Array.from({ length: 7 }, () =>
-    Array.from({ length: 24 }, () => new Set())
-  )
-  // Для кожного дня тижня — кількість дат з хоча б однією тривогою
-  const dowDays = Array.from({ length: 7 }, () => new Set())
+  // Кількість тривог по слоту [dow][hour]
+  const slotCount    = Array.from({ length: 7 }, () => Array(24).fill(0))
+  const slotDuration = Array.from({ length: 7 }, () => Array(24).fill(0))
+  const slotAlertCount = Array.from({ length: 7 }, () => Array(24).fill(0))
 
-  alerts.forEach(a => {
+  // Кількість тривог по дню тижня (для лівої колонки)
+  const dowCount = Array(7).fill(0)
+
+  alerts.forEach(function(a) {
     const d       = new Date(a.started_at)
     const dow     = (d.getDay() + 6) % 7
     const hour    = d.getHours()
-    const dateKey = a.started_at.slice(0, 10)
-    slotDays[dow][hour].add(dateKey)
-    dowDays[dow].add(dateKey)
+    slotCount[dow][hour]++
+    dowCount[dow]++
+    if (a.duration_minutes) {
+      slotDuration[dow][hour] += a.duration_minutes
+      slotAlertCount[dow][hour]++
+    }
   })
+
+  // Максимум серед усіх слотів — для нормалізації кольору
+  let maxSlotCount = 0
+  for (let d = 0; d < 7; d++) {
+    for (let h = 0; h < 24; h++) {
+      if (slotCount[d][h] > maxSlotCount) maxSlotCount = slotCount[d][h]
+    }
+  }
 
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 
-  const dayStats = DAY_LABELS.map((day, dow) => ({
-    day,
-    dow,
-    daysWithAlert: dowDays[dow].size,
-    totalDays    : dowTotals[dow],
-    probability  : dowDays[dow].size / Math.max(dowTotals[dow], 1),
-  }))
+  // Найтихіший день — мінімум по dowCount (серед тих де > 0)
+  const nonZeroDays = dowCount
+    .map(function(c, i) { return { count: c, dow: i } })
+    .filter(function(d) { return d.count >= 0 })
+  const quietestDow = nonZeroDays.reduce(function(min, d) {
+    return d.count < min.count ? d : min
+  }, nonZeroDays[0]).dow
 
-  const quietestDow = dayStats.reduce(
-    (min, s) => s.probability < min.probability ? s : min,
-    dayStats[0]
-  ).dow
+  const dayStats = DAY_LABELS.map(function(day, dow) {
+    return {
+      day        : day,
+      dow        : dow,
+      count      : dowCount[dow],
+      totalDays  : dowTotals[dow],
+    }
+  })
 
   return {
-    periodFrom : since.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }),
-    periodTo   : now.toLocaleDateString('uk-UA',   { day: 'numeric', month: 'short' }),
+    periodFrom  : since.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }),
+    periodTo    : now.toLocaleDateString('uk-UA',   { day: 'numeric', month: 'short' }),
     dowTotals,
+    dowCount,
     dayStats,
     quietestDow,
-    cells: DAY_LABELS.map((day, dow) =>
-      Array.from({ length: 24 }, (_, hour) => ({
-        day,
-        dow,
-        hour,
-        label      : `${String(hour).padStart(2, '0')}:00`,
-        count      : slotDays[dow][hour].size,
-        probability: slotDays[dow][hour].size / Math.max(dowTotals[dow], 1),
-      }))
-    ),
+    maxSlotCount,
+    cells: DAY_LABELS.map(function(day, dow) {
+      return Array.from({ length: 24 }, function(_, hour) {
+        const count = slotCount[dow][hour]
+        const dur   = slotAlertCount[dow][hour] > 0
+          ? Math.round(slotDuration[dow][hour] / slotAlertCount[dow][hour])
+          : 0
+        return {
+          day        : day,
+          dow        : dow,
+          hour       : hour,
+          label      : String(hour).padStart(2, '0') + ':00',
+          count      : count,
+          avgDuration: dur,
+        }
+      })
+    }),
   }
 }
 
@@ -239,25 +263,25 @@ export function computeForecast(alerts, hoursAhead = 6) {
     const dow  = (future.getDay() + 6) % 7
     const hour = future.getHours()
 
-    const baseProbability = heatmap.cells[dow][hour].probability
+    // Нормалізована відносна імовірність (0..1) на базі абсолютних кількостей
+    const maxCount = heatmap.maxSlotCount || 1
+    const slotCount = heatmap.cells[dow][hour].count
+    const baseProbability = slotCount / maxCount
 
-    // Корекція на інтервал: якщо пройшло більше середнього інтервалу — ризик зростає
+    // Корекція на інтервал
     let adjustedProbability = baseProbability
     if (lastAlert && avgIntervalHours) {
       const hoursSinceLast = (now - lastAlert) / 3600000 + i
       const intervalRatio  = hoursSinceLast / avgIntervalHours
-      // Логістична корекція: плавно підвищуємо від 0.8x до 1.3x
       const correction = 0.8 + 0.5 / (1 + Math.exp(-2 * (intervalRatio - 1)))
       adjustedProbability = Math.min(baseProbability * correction, 0.95)
     }
 
-    // Довірчий інтервал Вілсона для бінарних пропорцій
-    const n = heatmap.totalWeeks
+    // Довірчий інтервал — спрощений на базі кількості спостережень
+    const n = heatmap.dowTotals[dow] || 1
     const p = baseProbability
-    const z = 1.645 // 90% CI
-    const margin = n > 0
-      ? z * Math.sqrt((p * (1 - p)) / n)
-      : 0.1
+    const z = 1.645
+    const margin = z * Math.sqrt((p * (1 - p)) / n)
 
     slots.push({
       hour        : future.getHours(),
