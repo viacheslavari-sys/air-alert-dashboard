@@ -2,7 +2,6 @@ name: Collect Alert History
 
 on:
   schedule:
-    # Щодня о 23:30 UTC (02:30 за Києвом)
     - cron: '30 23 * * *'
   workflow_dispatch:
 
@@ -24,21 +23,16 @@ jobs:
         run: |
           set -e
 
-          # Перевірка токена
           if [ -z "$ALERTS_TOKEN" ]; then
-            echo "❌ ALERTS_TOKEN is not set. Add it to repo Secrets."
+            echo "❌ ALERTS_TOKEN is not set"
             exit 1
           fi
 
-          echo "✅ Token found, fetching data..."
-
-          # ── 1. Отримати свіжі дані ────────────────────────────────────
           echo "Fetching Kyiv oblast..."
           HTTP=$(curl -s -o /tmp/kyiv_fresh.json -w "%{http_code}" \
             -H "Authorization: Bearer $ALERTS_TOKEN" \
             -H "Accept: application/json" \
             "https://api.alerts.in.ua/v1/regions/14/alerts/month_ago.json")
-
           if [ "$HTTP" != "200" ]; then
             echo "❌ Kyiv fetch failed: HTTP $HTTP"
             cat /tmp/kyiv_fresh.json
@@ -51,7 +45,6 @@ jobs:
             -H "Authorization: Bearer $ALERTS_TOKEN" \
             -H "Accept: application/json" \
             "https://api.alerts.in.ua/v1/regions/10/alerts/month_ago.json")
-
           if [ "$HTTP" != "200" ]; then
             echo "❌ Zhytomyr fetch failed: HTTP $HTTP"
             cat /tmp/zhytomyr_fresh.json
@@ -59,11 +52,10 @@ jobs:
           fi
           echo "✅ Zhytomyr: HTTP $HTTP"
 
-          # ── 2. Злити з існуючою історією ─────────────────────────────
           node << 'NODEEOF'
           const fs = require('fs')
 
-          let existing = { kyiv: [], zhytomyr: [] }
+          let existing = { kyiv: [], zhytomyr: [], collection_started_at: null }
           try {
             existing = JSON.parse(fs.readFileSync('data/history.json', 'utf8'))
           } catch (e) {
@@ -88,14 +80,26 @@ jobs:
             })
           }
 
+          const now = new Date().toISOString()
+
           const result = {
-            kyiv      : merge(existing.kyiv,     kyivFresh),
-            zhytomyr  : merge(existing.zhytomyr, zhytomyrFresh),
-            updated_at: new Date().toISOString(),
+            kyiv                 : merge(existing.kyiv,     kyivFresh),
+            zhytomyr             : merge(existing.zhytomyr, zhytomyrFresh),
+            // Зберігаємо дату першого запуску — не перезаписуємо якщо вже є
+            collection_started_at: existing.collection_started_at || now,
+            updated_at           : now,
           }
 
-          console.log('Kyiv total:     ' + result.kyiv.length)
-          console.log('Zhytomyr total: ' + result.zhytomyr.length)
+          // Рахуємо кількість зібраних днів
+          const startDate  = new Date(result.collection_started_at)
+          const today      = new Date()
+          const daysSince  = Math.floor((today - startDate) / 86400000)
+          result.days_collected = daysSince + 1  // +1 бо перший день теж рахується
+
+          console.log('Kyiv total:      ' + result.kyiv.length)
+          console.log('Zhytomyr total:  ' + result.zhytomyr.length)
+          console.log('Collection start:' + result.collection_started_at)
+          console.log('Days collected:  ' + result.days_collected)
 
           fs.mkdirSync('data', { recursive: true })
           fs.writeFileSync('data/history.json', JSON.stringify(result))
@@ -108,4 +112,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/history.json
           git diff --staged --quiet && echo "No changes" || \
-            git commit -m "chore: update alert history $(date -u +%Y-%m-%d)" && git push
+            (git commit -m "chore: update alert history $(date -u +%Y-%m-%d)" && git push)

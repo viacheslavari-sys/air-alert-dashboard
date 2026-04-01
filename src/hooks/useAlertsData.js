@@ -138,13 +138,18 @@ export function useAlertsData() {
         var kyivAll     = mergeAlerts(kyivFresh,     kyivAcc)
         var zhytomyrAll = mergeAlerts(zhytomyrFresh, zhytomyrAcc)
 
+        // Використовуємо лічильник з history.json якщо він є
+        var daysCollected = accumulated && accumulated.days_collected
+          ? accumulated.days_collected
+          : calcHistoryDays(kyivAll)
+
         if (!cancelled) setState({
           loading     : false,
           error       : null,
           isMock      : false,
           kyiv        : buildRegionState(kyivAll),
           zhytomyr    : buildRegionState(zhytomyrAll),
-          historyDays : calcHistoryDays(kyivAll),
+          historyDays : daysCollected,
         })
       } catch (err) {
         var kf = generateMockAlerts()
