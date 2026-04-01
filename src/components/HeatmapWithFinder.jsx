@@ -35,7 +35,6 @@ function findSafeWindows(hm, windowSize) {
   return results
 }
 
-// Будує set підсвічених клітинок для швидкого lookup
 function buildHighlightSet(windows) {
   var set = {}
   windows.forEach(function(w) {
@@ -46,7 +45,6 @@ function buildHighlightSet(windows) {
   return set
 }
 
-// Будує set "блимаючих" клітинок при наведенні на тег
 function buildBlinkSet(win) {
   if (!win) return {}
   var set = {}
@@ -57,17 +55,21 @@ function buildBlinkSet(win) {
 }
 
 export function HeatmapWithFinder({ alerts, regionKey }) {
-  var _win       = useState(4)
-  var windowSize = _win[0]
-  var setWindow  = _win[1]
+  var _win        = useState(8)
+  var windowSize  = _win[0]
+  var setWindow   = _win[1]
 
-  var _hover    = useState(null)
+  var _active    = useState(false)
+  var isActive   = _active[0]
+  var setActive  = _active[1]
+
+  var _hover     = useState(null)
   var hoveredWin = _hover[0]
   var setHovered = _hover[1]
 
-  var hm       = computeHeatmap(alerts)
-  var windows  = findSafeWindows(hm, windowSize)
-  var hlSet    = buildHighlightSet(windows)
+  var hm      = computeHeatmap(alerts)
+  var windows = isActive ? findSafeWindows(hm, windowSize) : []
+  var hlSet   = isActive ? buildHighlightSet(windows) : {}
   var blinkSet = buildBlinkSet(hoveredWin)
 
   var maxWindow = HOUR_END - HOUR_START + 1
@@ -79,15 +81,15 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
       {/* ── Заголовок ── */}
       <div className="chart-header">
         <div>
-          <h2 className="chart-title">Теплова карта · Пошук безпечних вікон</h2>
+          <h2 className="chart-title">Теплова карта тривог</h2>
           <p className="chart-subtitle">
-            {hm.periodFrom} — {hm.periodTo} · колір = кількість тривог
+            {hm.periodFrom} — {hm.periodTo} · кількість тривог за слот
           </p>
         </div>
 
-        {/* Слайдер */}
+        {/* Контролі пошуку */}
         <div className="sf-controls">
-          <span className="sf-controls-label">Вікно без тривог</span>
+          <span className="sf-controls-label">Пошук безпечного вікна</span>
           <div className="sf-slider-row">
             <button
               className="sf-btn"
@@ -100,22 +102,31 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
               onClick={function() { setWindow(Math.min(maxWindow, windowSize + 1)) }}
               disabled={windowSize >= maxWindow}
             >+</button>
+            <button
+              className={'sf-toggle-btn ' + (isActive ? 'sf-toggle-btn--active' : '')}
+              onClick={function() {
+                setActive(!isActive)
+                if (isActive) setHovered(null)
+              }}
+            >
+              {isActive ? 'Сховати' : 'Показати'}
+            </button>
           </div>
         </div>
       </div>
 
       {/* ── Теплова карта ── */}
       <div className="heatmap-wrap">
-        {/* Заголовок годин */}
         <div className="hm-row hm-header-row">
           <span className="hm-day-label" />
           <span className="hm-count-label" title="Всього тривог за період">∑</span>
           {HOUR_LABELS.map(function(l, h) {
+            var outOfRange = isActive && (h < HOUR_START || h > HOUR_END)
             return (
               <span
                 key={h}
                 className="hm-hour-label"
-                style={{ opacity: (h >= HOUR_START && h <= HOUR_END) ? 1 : 0.3 }}
+                style={{ opacity: outOfRange ? 0.2 : 1 }}
               >
                 {l}
               </span>
@@ -145,9 +156,11 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
                 var inRange    = cell.hour >= HOUR_START && cell.hour <= HOUR_END
                 var isGreen    = hlSet[key]
                 var isBlinking = blinkSet[key]
+                // Затемнення нічних годин тільки в активному режимі
+                var isDim      = isActive && !inRange
 
                 var bg
-                if (!inRange) {
+                if (isDim) {
                   bg = 'rgba(255,255,255,0.01)'
                 } else if (isGreen) {
                   bg = 'hsla(142, 70%, 50%, 0.65)'
@@ -161,13 +174,13 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
                     key={cell.hour}
                     className={
                       'hm-cell' +
-                      (isGreen    ? ' hm-cell--safe'    : '') +
-                      (isBlinking ? ' hm-cell--blink'   : '') +
-                      (!inRange   ? ' hm-cell--dim'     : '')
+                      (isGreen    ? ' hm-cell--safe'  : '') +
+                      (isBlinking ? ' hm-cell--blink' : '') +
+                      (isDim      ? ' hm-cell--dim'   : '')
                     }
                     style={{ background: bg }}
                     title={
-                      !inRange ? '' :
+                      isDim ? '' :
                       isGreen
                         ? cell.day + ' ' + cell.label + ' — безпечна година'
                         : cell.day + ' ' + cell.label + ' — ' + cell.count + ' тривог' +
@@ -181,47 +194,45 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
         })}
       </div>
 
-      {/* ── Результати пошуку ── */}
-      <div className="sf-results-section">
-        <div className="sf-results-header">
-          {windows.length === 0
-            ? 'Немає чистих вікон на ' + windowSize + ' год у діапазоні 06:00–22:00'
-            : 'Знайдено ' + windows.length + ' вікн' +
-              (windows.length === 1 ? 'о' : windows.length < 5 ? 'а' : '') +
-              ' без тривог'}
-        </div>
+      {/* ── Результати — тільки в активному режимі ── */}
+      {isActive && (
+        <div className="sf-results-section">
+          <div className="sf-results-header">
+            {windows.length === 0
+              ? 'Немає чистих вікон на ' + windowSize + ' год у діапазоні 06:00–22:00 — спробуйте зменшити тривалість'
+              : 'Знайдено ' + windows.length + ' вікн' +
+                (windows.length === 1 ? 'о' : windows.length < 5 ? 'а' : '') +
+                ' без тривог · наведіть щоб підсвітити на карті'}
+          </div>
 
-        {windows.length === 0 ? (
-          <div className="sf-no-results">
-            Спробуйте зменшити тривалість вікна.
-          </div>
-        ) : (
-          <div className="sf-tags">
-            {windows.map(function(w) {
-              return (
-                <span
-                  key={w.key}
-                  className={'sf-tag ' + (hoveredWin && hoveredWin.key === w.key ? 'sf-tag--hovered' : '')}
-                  onMouseEnter={function() { setHovered(w) }}
-                  onMouseLeave={function() { setHovered(null) }}
-                >
-                  <span className="sf-tag-day">{w.day}</span>
-                  <span className="sf-tag-time">
-                    {String(w.startHour).padStart(2, '0')}:00 –{' '}
-                    {String(w.startHour + windowSize).padStart(2, '0')}:00
+          {windows.length > 0 && (
+            <div className="sf-tags">
+              {windows.map(function(w) {
+                return (
+                  <span
+                    key={w.key}
+                    className={'sf-tag ' + (hoveredWin && hoveredWin.key === w.key ? 'sf-tag--hovered' : '')}
+                    onMouseEnter={function() { setHovered(w) }}
+                    onMouseLeave={function() { setHovered(null) }}
+                  >
+                    <span className="sf-tag-day">{w.day}</span>
+                    <span className="sf-tag-time">
+                      {String(w.startHour).padStart(2, '0')}:00 –{' '}
+                      {String(w.startHour + windowSize).padStart(2, '0')}:00
+                    </span>
                   </span>
-                </span>
-              )
-            })}
-          </div>
-        )}
-      </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="hm-note">
-        Зелені клітинки = нуль тривог за весь зібраний період.
-        Наведіть на тег щоб підсвітити вікно на карті.
-        Години поза 06:00–22:00 затемнені.
-        Статистичний прогноз — не гарантія.
+        ∑ = загальна кількість тривог за весь зібраний період для цього дня тижня.
+        {isActive
+          ? ' Зелені клітинки = нуль тривог. Нічні години затемнені під час пошуку. Статистичний прогноз — не гарантія.'
+          : ' Натисніть «Показати» для пошуку безпечних вікон у діапазоні 06:00–22:00.'}
       </p>
     </div>
   )
