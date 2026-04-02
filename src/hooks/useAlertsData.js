@@ -97,7 +97,7 @@ function calcHistoryDays(alerts) {
 }
 
 export function useAlertsData() {
-  var _state   = useState({ loading: true, error: null, isMock: USE_MOCK, kyiv: null, zhytomyr: null, historyDays: 30, forecastHistory: null })
+  var _state   = useState({ loading: true, error: null, isMock: USE_MOCK, kyiv: null, zhytomyr: null, historyDays: 30, forecastHistory: null, dailyCounts: null })
   var state    = _state[0]
   var setState = _state[1]
 
@@ -151,6 +151,7 @@ export function useAlertsData() {
           zhytomyr       : buildRegionState(zhytomyrAll),
           historyDays    : daysCollected,
           forecastHistory: accumulated && accumulated.forecasts ? accumulated.forecasts : null,
+          dailyCounts    : accumulated && accumulated.daily_counts ? accumulated.daily_counts : null,
         })
       } catch (err) {
         var kf = generateMockAlerts()

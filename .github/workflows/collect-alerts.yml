@@ -185,16 +185,48 @@ jobs:
           if (existing.forecasts.zhytomyr.length > 90)
             existing.forecasts.zhytomyr = existing.forecasts.zhytomyr.slice(-90)
 
+          // ── Будуємо daily_counts ─────────────────────────────────────
+          const KYIV_FILTER     = ['Вишгородський район', 'Київська область']
+          const ZHYTOMYR_FILTER = ['Житомирський район',  'Житомирська область']
+
+          function buildDailyCounts(alerts, filter, startedAt) {
+            const counts = {}
+            alerts
+              .filter(function(a) { return filter.indexOf(a.location_title) !== -1 })
+              .forEach(function(a) {
+                const day = a.started_at.slice(0, 10)
+                counts[day] = (counts[day] || 0) + 1
+              })
+            // Заповнюємо нулями від початку збору до сьогодні
+            const start = new Date(startedAt)
+            start.setHours(0, 0, 0, 0)
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const result = {}
+            const cur = new Date(start)
+            while (cur <= today) {
+              const key = cur.toISOString().slice(0, 10)
+              result[key] = counts[key] || 0
+              cur.setDate(cur.getDate() + 1)
+            }
+            return result
+          }
+
           // ── Зберігаємо ───────────────────────────────────────────────
-          const now = new Date().toISOString()
-          const startDate  = new Date(existing.collection_started_at || now)
-          const daysSince  = Math.floor((new Date() - startDate) / 86400000)
+          const now            = new Date().toISOString()
+          const collectionStart = existing.collection_started_at || now
+          const startDate      = new Date(collectionStart)
+          const daysSince      = Math.floor((new Date() - startDate) / 86400000)
 
           const result = {
             kyiv                 : kyivAll,
             zhytomyr             : zhytomyrAll,
             forecasts            : existing.forecasts,
-            collection_started_at: existing.collection_started_at || now,
+            daily_counts         : {
+              kyiv    : buildDailyCounts(kyivAll,     KYIV_FILTER,     collectionStart),
+              zhytomyr: buildDailyCounts(zhytomyrAll, ZHYTOMYR_FILTER, collectionStart),
+            },
+            collection_started_at: collectionStart,
             updated_at           : now,
             days_collected       : daysSince + 1,
           }
@@ -204,6 +236,7 @@ jobs:
           console.log('Kyiv forecasts:      ' + result.forecasts.kyiv.length)
           console.log('Zhytomyr forecasts:  ' + result.forecasts.zhytomyr.length)
           console.log('Days collected:      ' + result.days_collected)
+          console.log('Daily counts kyiv:   ' + Object.keys(result.daily_counts.kyiv).length + ' days')
 
           fs.mkdirSync('data', { recursive: true })
           fs.writeFileSync('data/history.json', JSON.stringify(result))

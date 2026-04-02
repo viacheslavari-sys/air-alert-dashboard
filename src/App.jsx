@@ -15,6 +15,7 @@ export default function App() {
   var zhytomyr  = _data.zhytomyr
   var historyDays     = _data.historyDays
   var forecastHistory = _data.forecastHistory
+  var dailyCounts     = _data.dailyCounts
 
   var _region      = useState('kyiv')
   var selectedRegion = _region[0]
@@ -106,6 +107,7 @@ export default function App() {
             <DailyAlertsChart
               alerts={current.alerts}
               regionKey={selectedRegion}
+              dailyCounts={dailyCounts && dailyCounts[selectedRegion]}
             />
           </>
         )}
