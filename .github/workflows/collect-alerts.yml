@@ -189,16 +189,22 @@ jobs:
           const KYIV_FILTER     = ['Вишгородський район', 'Київська область']
           const ZHYTOMYR_FILTER = ['Житомирський район',  'Житомирська область']
 
-          function buildDailyCounts(alerts, filter, startedAt) {
+          function buildDailyCounts(alerts, filter) {
+            const filtered = alerts.filter(function(a) {
+              return filter.indexOf(a.location_title) !== -1
+            })
             const counts = {}
-            alerts
-              .filter(function(a) { return filter.indexOf(a.location_title) !== -1 })
-              .forEach(function(a) {
-                const day = a.started_at.slice(0, 10)
-                counts[day] = (counts[day] || 0) + 1
-              })
-            // Заповнюємо нулями від початку збору до сьогодні
-            const start = new Date(startedAt)
+            filtered.forEach(function(a) {
+              const day = a.started_at.slice(0, 10)
+              counts[day] = (counts[day] || 0) + 1
+            })
+            // Заповнюємо нулями від найстарішої тривоги до сьогодні
+            const sorted = filtered.slice().sort(function(a, b) {
+              return new Date(a.started_at) - new Date(b.started_at)
+            })
+            const start = sorted.length > 0
+              ? new Date(sorted[0].started_at)
+              : new Date()
             start.setHours(0, 0, 0, 0)
             const today = new Date()
             today.setHours(0, 0, 0, 0)
@@ -228,8 +234,8 @@ jobs:
             zhytomyr             : zhytomyrAll,
             forecasts            : existing.forecasts,
             daily_counts         : {
-              kyiv    : buildDailyCounts(kyivAll,     KYIV_FILTER,     collectionStart),
-              zhytomyr: buildDailyCounts(zhytomyrAll, ZHYTOMYR_FILTER, collectionStart),
+              kyiv    : buildDailyCounts(kyivAll,     KYIV_FILTER),
+              zhytomyr: buildDailyCounts(zhytomyrAll, ZHYTOMYR_FILTER),
             },
             collection_started_at: collectionStart,
             updated_at           : now,
