@@ -1192,3 +1192,72 @@ body {
   font-size: 12px;
   line-height: 1.6;
 }
+
+/* ── Decay heatmap controls ── */
+.hm-top-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.hm-decay-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.hm-decay-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hm-decay-edge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.hm-decay-slider {
+  width: 120px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.hm-decay-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Search range buttons ── */
+.sf-range-btn {
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.sf-range-btn:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.sf-range-btn--active {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #86efac;
+}
