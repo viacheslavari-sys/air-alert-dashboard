@@ -56,7 +56,9 @@ async function fetchRegion(region) {
 
 async function fetchAccumulated() {
   try {
-    var res = await fetch(HISTORY_URL)
+    // Додаємо timestamp щоб обходити CDN кеш GitHub
+    var url = HISTORY_URL + '?t=' + Math.floor(Date.now() / 300000) // оновлюється кожні 5 хв
+    var res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) return null
     return res.json()
   } catch (e) {
