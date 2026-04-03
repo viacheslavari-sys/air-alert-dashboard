@@ -2,6 +2,16 @@ import { useState } from 'react'
 import { computeHeatmap } from '../data/mockAlerts'
 
 const DAY_LABELS  = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
+
+// Колір ∑ від зеленого (мало) до червоного (багато)
+function dowCountColor(count, maxCount) {
+  if (maxCount === 0) return '#8899aa'
+  var ratio = count / maxCount
+  if (ratio <= 0.25) return '#4ade80'  // зелений
+  if (ratio <= 0.5)  return '#a3e635'  // жовто-зелений
+  if (ratio <= 0.75) return '#f97316'  // помаранчевий
+  return '#ef4444'                      // червоний
+}
 const HOUR_START  = 6
 const HOUR_END    = 22
 const HOUR_LABELS = Array.from({ length: 24 }, function(_, h) {
@@ -144,11 +154,10 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
               <span className="hm-day-label">{DAY_LABELS[dow]}</span>
               <span
                 className="hm-count-label"
-                style={{ color: isQuietest ? '#4ade80' : '#8899aa' }}
+                style={{ color: dowCountColor(hm.dowCount[dow], Math.max.apply(null, hm.dowCount)) }}
                 title={DAY_LABELS[dow] + ' — ' + hm.dowCount[dow] + ' тривог за весь період'}
               >
                 {hm.dowCount[dow]}
-                {isQuietest && <span className="hm-quiet-badge">тихо</span>}
               </span>
 
               {dayCells.map(function(cell) {
