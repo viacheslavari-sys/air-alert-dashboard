@@ -215,8 +215,13 @@ jobs:
           // ── Зберігаємо ───────────────────────────────────────────────
           const now            = new Date().toISOString()
           const collectionStart = existing.collection_started_at || now
-          const startDate      = new Date(collectionStart)
-          const daysSince      = Math.floor((new Date() - startDate) / 86400000)
+
+          // Рахуємо від найстарішої тривоги в обох регіонах
+          const allAlerts  = kyivAll.concat(zhytomyrAll)
+          const oldestDate = allAlerts.length > 0
+            ? new Date(allAlerts[allAlerts.length - 1].started_at)
+            : new Date(collectionStart)
+          const daysSince  = Math.floor((new Date() - oldestDate) / 86400000)
 
           const result = {
             kyiv                 : kyivAll,
