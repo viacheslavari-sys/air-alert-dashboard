@@ -212,10 +212,49 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
     accuracy = calcAccuracy(evaluatedRows, hourlyActuals)
   }
 
-  // В режимі history показуємо тільки слоти >= 50% щоб графік відповідав метрикам
-  var displayData = mode === 'history'
-    ? historyData.filter(function(r) { return r.prob >= 0.5 })
-    : historyData
+  // В режимі history показуємо слоти >= 50% + маркери пропущених тривог
+  var displayData = historyData
+  if (mode === 'history' && hourlyActuals) {
+    var filteredHigh = historyData.filter(function(r) { return r.prob >= 0.5 })
+
+    // Знаходимо пропущені тривоги — були але не прогнозувались
+    var predictedKeys = {}
+    historyData.forEach(function(r) {
+      if (r.dt && r.prob >= 0.5) predictedKeys[r.dt.slice(0, 13)] = true
+    })
+    var firstDt = null
+    historyData.forEach(function(r) {
+      if (!r.dt) return
+      if (!firstDt || r.dt < firstDt) firstDt = r.dt
+    })
+    var missedRows = []
+    Object.keys(hourlyActuals).sort().forEach(function(day) {
+      hourlyActuals[day].forEach(function(v, h) {
+        if (v !== 1) return
+        var slotDt = day + 'T' + String(h).padStart(2, '0') + ':00:00.000Z'
+        if (firstDt && slotDt < firstDt) return
+        var key = day + 'T' + String(h).padStart(2, '0')
+        if (!predictedKeys[key]) {
+          missedRows.push({
+            dt         : slotDt,
+            label      : fmtDt(slotDt),
+            prob       : null,
+            had_alert  : 1,
+            alertMarker: null,
+            missedAlert: 0.01,  // показуємо внизу графіку
+            made_at    : null,
+          })
+        }
+      })
+    })
+
+    // Зливаємо і сортуємо по часу
+    displayData = filteredHigh.concat(missedRows).sort(function(a, b) {
+      return new Date(a.dt) - new Date(b.dt)
+    })
+  } else if (mode === 'history') {
+    displayData = historyData.filter(function(r) { return r.prob >= 0.5 })
+  }
   var chartData  = mode === 'forecast' ? liveData : displayData
   var hasHistory = savedForecasts.length > 0
 
@@ -381,6 +420,30 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
                 isAnimationActive={false}
               />
             )}
+
+            {/* Пропущені тривоги — хрестики внизу */}
+            {mode === 'history' && (
+              <Line
+                dataKey="missedAlert"
+                name="Пропущена тривога"
+                stroke="none"
+                dot={function(props) {
+                  var row = props.payload
+                  if (!row || row.missedAlert == null) return null
+                  var cx = props.cx
+                  var cy = props.cy
+                  var r  = 5
+                  return (
+                    <g key={props.index}>
+                      <line x1={cx-r} y1={cy-r} x2={cx+r} y2={cy+r} stroke="#f97316" strokeWidth={2} />
+                      <line x1={cx+r} y1={cy-r} x2={cx-r} y2={cy+r} stroke="#f97316" strokeWidth={2} />
+                    </g>
+                  )
+                }}
+                activeDot={false}
+                isAnimationActive={false}
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
       )}
@@ -388,7 +451,7 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
       <p className="hm-note">
         {mode === 'forecast'
           ? 'Засновано на статистиці за ' + (alerts.length > 0 ? 'зібраний період' : '30 днів') + '. Не є оперативним прогнозом.'
-          : 'Стовпці = прогноз · червоні крапки = реальні тривоги · порожньо = дані ще збираються.'}
+          : 'Стовпці = прогноз · 🔴 крапка = тривога була · ✕ = пропущена тривога (не прогнозувалась)'}
       </p>
     </div>
   )
