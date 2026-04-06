@@ -119,18 +119,21 @@ function calcAccuracy(rows, hourlyActuals) {
       if (key) predictedSet[key] = true
     })
 
-    // Визначаємо діапазон прогнозів — тільки в цьому діапазоні рахуємо Recall
-    var forecastDates = {}
+    // Визначаємо дні де прогнози вже оцінені (had_alert !== null)
+    // Тільки такі дні рахуємо в Recall — уникаємо сьогоднішніх неоцінених прогнозів
+    var evaluatedDates = {}
     rows.forEach(function(r) {
-      if (r.dt) forecastDates[r.dt.slice(0, 10)] = true
+      if (r.dt && r.had_alert !== null) {
+        evaluatedDates[r.dt.slice(0, 10)] = true
+      }
     })
 
     // Рахуємо скільки реальних тривог ми пропустили (не прогнозували)
-    // Тільки в днях де були прогнози
+    // Тільки в днях де прогнози вже оцінені
     var totalRealAlerts = 0
     var missedAlerts    = 0
     Object.keys(hourlyActuals).forEach(function(day) {
-      if (!forecastDates[day]) return  // пропускаємо дні без прогнозів
+      if (!evaluatedDates[day]) return  // пропускаємо дні без оцінених прогнозів
       var hours = hourlyActuals[day]
       hours.forEach(function(hadAlert, hour) {
         if (hadAlert !== 1) return
