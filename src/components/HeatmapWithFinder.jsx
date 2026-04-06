@@ -8,12 +8,6 @@ const HOUR_LABELS = Array.from({ length: 24 }, function(_, h) {
   return h % 3 === 0 ? String(h).padStart(2, '0') : ''
 })
 
-const SEARCH_RANGES = [
-  { label: '7 днів',  days: 7  },
-  { label: '14 днів', days: 14 },
-  { label: '30 днів', days: 30 },
-]
-
 // Колір ∑ від зеленого до червоного
 function dowCountColor(count, maxCount) {
   if (maxCount === 0) return '#8899aa'
@@ -144,10 +138,6 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
   var isActive  = _active[0]
   var setActive = _active[1]
 
-  var _range      = useState(1)  // індекс SEARCH_RANGES, дефолт 14 днів
-  var rangeIdx    = _range[0]
-  var setRange    = _range[1]
-
   var _hover     = useState(null)
   var hoveredWin = _hover[0]
   var setHovered = _hover[1]
@@ -161,7 +151,7 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
   var hm       = computeHeatmap(alerts || [])
 
   // Пошук вікон
-  var searchDays = SEARCH_RANGES[rangeIdx].days
+  var searchDays = decayDays
   var windows    = isActive ? findSafeWindows(alerts || [], windowSize, searchDays) : []
   var hlSet      = isActive ? buildHighlightSet(windows) : {}
   var blinkSet   = buildBlinkSet(hoveredWin)
@@ -215,18 +205,7 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
                 onClick={function() { setWindow(Math.min(maxWindow, windowSize + 1)) }}
                 disabled={windowSize >= maxWindow}
               >+</button>
-              {/* Діапазон пошуку */}
-              {SEARCH_RANGES.map(function(opt, i) {
-                return (
-                  <button
-                    key={opt.label}
-                    className={'sf-range-btn ' + (rangeIdx === i ? 'sf-range-btn--active' : '')}
-                    onClick={function() { setRange(i) }}
-                  >
-                    {opt.label}
-                  </button>
-                )
-              })}
+
               <button
                 className={'sf-toggle-btn ' + (isActive ? 'sf-toggle-btn--active' : '')}
                 onClick={function() {
