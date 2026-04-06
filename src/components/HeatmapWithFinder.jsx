@@ -245,7 +245,7 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
       <div className="heatmap-wrap">
         <div className="hm-row hm-header-row">
           <span className="hm-day-label" />
-          <span className="hm-count-label" title="Всього тривог за весь час">∑</span>
+          <span className="hm-count-label" title={'Тривог за ' + decayDays + ' дн'}>∑</span>
           {HOUR_LABELS.map(function(l, h) {
             var outOfRange = isActive && (h < HOUR_START || h > HOUR_END)
             return (
@@ -266,10 +266,10 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
               <span className="hm-day-label">{DAY_LABELS[dow]}</span>
               <span
                 className="hm-count-label"
-                style={{ color: dowCountColor(hm.dowCount[dow], Math.max.apply(null, hm.dowCount)) }}
-                title={DAY_LABELS[dow] + ' — ' + hm.dowCount[dow] + ' тривог за весь час'}
+                style={{ color: dowCountColor(decay.dowCount[dow], Math.max.apply(null, decay.dowCount)) }}
+                title={DAY_LABELS[dow] + ' — ' + decay.dowCount[dow] + ' тривог за ' + decayDays + ' дн'}
               >
-                {hm.dowCount[dow]}
+                {decay.dowCount[dow]}
               </span>
 
               {dayCells.map(function(cell) {
@@ -355,7 +355,7 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
       )}
 
       <p className="hm-note">
-        ∑ = загальна кількість тривог за весь час · яскравість = кількість у вікні {decayDays} дн.
+        ∑ = кількість тривог за обране вікно · яскравість нормалізована відносно максимуму у вікні.
         {isActive && ' Пошук вікон — тривоги без ' + searchDays + ' дн.'}
       </p>
     </div>
