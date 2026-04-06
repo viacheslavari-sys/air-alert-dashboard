@@ -385,11 +385,16 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
               fillOpacity={0.8}
             >
               {chartData.map(function(entry, i) {
-                var p = entry.prob || 0
+                var p       = entry.prob || 0
+                var hit     = entry.had_alert === 1
+                var baseColor = p >= 0.35 ? '#ef4444' : p >= 0.2 ? '#f97316' : '#3b82f6'
                 return (
                   <Cell
                     key={i}
-                    fill={p >= 0.35 ? '#ef4444' : p >= 0.2 ? '#f97316' : '#3b82f6'}
+                    fill={hit ? '#4ade80' : baseColor}
+                    stroke={hit ? '#86efac' : 'none'}
+                    strokeWidth={hit ? 1.5 : 0}
+                    fillOpacity={hit ? 1 : 0.8}
                   />
                 )
               })}
