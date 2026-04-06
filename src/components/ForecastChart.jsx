@@ -97,26 +97,27 @@ function buildHistoryData(forecasts, daysLimit) {
   return Object.values(byDt).sort(function(a, b) { return new Date(a.dt) - new Date(b.dt) })
 }
 
-// Рахує точність прогнозу по порогу 0.5
+// Рахує метрики якості прогнозу
+// Всі збережені слоти мають prob >= 0.5 (ми зберігаємо тільки їх)
+// Тому predicted = 1 для всіх рядків з prob
 function calcAccuracy(rows) {
-  var total   = 0
-  var correct = 0
-  rows.forEach(function(row) {
-    if (row.had_alert === null) return  // ще не відомо
-    total++
-    var predicted = row.prob >= 0.5 ? 1 : 0
-    if (predicted === row.had_alert) correct++
-  })
-  if (total === 0) return null
+  var known = rows.filter(function(r) { return r.had_alert !== null })
+  if (known.length === 0) return null
+
+  // Всі збережені слоти — це прогнози "буде тривога" (prob >= 0.5)
+  var truePos  = known.filter(function(r) { return r.had_alert === 1 }).length
+  var falsePos = known.filter(function(r) { return r.had_alert === 0 }).length
+
+  // Precision: з тих що передбачили — скільки справді було
+  var precision = known.length > 0
+    ? Math.round(truePos / known.length * 100)
+    : 0
+
   return {
-    correct : correct,
-    total   : total,
-    pct     : Math.round(correct / total * 100),
-    // Скільки разів прогноз казав "буде" і справді було
-    truePos : rows.filter(function(r) { return r.had_alert === 1 && r.prob >= 0.5 }).length,
-    falsePos: rows.filter(function(r) { return r.had_alert === 0 && r.prob >= 0.5 }).length,
-    trueNeg : rows.filter(function(r) { return r.had_alert === 0 && r.prob < 0.5  }).length,
-    falseNeg: rows.filter(function(r) { return r.had_alert === 1 && r.prob < 0.5  }).length,
+    truePos  : truePos,
+    falsePos : falsePos,
+    total    : known.length,
+    precision: precision,
   }
 }
 
@@ -221,27 +222,24 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
       {mode === 'history' && accuracy && (
         <div className="fc-accuracy">
           <div className="fc-acc-main">
-            <span className="fc-acc-value">{accuracy.pct}%</span>
-            <span className="fc-acc-label">точність · {accuracy.correct} з {accuracy.total} слотів</span>
+            <span className="fc-acc-value">{accuracy.precision}%</span>
+            <span className="fc-acc-label">
+              precision · з {accuracy.total} прогнозів тривоги
+            </span>
           </div>
           <div className="fc-acc-grid">
             <div className="fc-acc-cell fc-acc-cell--good">
               <span className="fc-acc-num">{accuracy.truePos}</span>
-              <span className="fc-acc-desc">вгадав тривогу</span>
+              <span className="fc-acc-desc">тривога справді була</span>
             </div>
             <div className="fc-acc-cell fc-acc-cell--bad">
               <span className="fc-acc-num">{accuracy.falsePos}</span>
-              <span className="fc-acc-desc">хибна тривога</span>
-            </div>
-            <div className="fc-acc-cell fc-acc-cell--bad">
-              <span className="fc-acc-num">{accuracy.falseNeg}</span>
-              <span className="fc-acc-desc">пропущена тривога</span>
-            </div>
-            <div className="fc-acc-cell fc-acc-cell--good">
-              <span className="fc-acc-num">{accuracy.trueNeg}</span>
-              <span className="fc-acc-desc">вгадав тишу</span>
+              <span className="fc-acc-desc">тривоги не було</span>
             </div>
           </div>
+          <p className="fc-acc-note">
+            Recall (пропущені тривоги) буде доступний після інтеграції повного журналу тихих годин.
+          </p>
         </div>
       )}
 
