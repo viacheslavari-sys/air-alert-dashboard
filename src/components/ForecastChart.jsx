@@ -88,7 +88,7 @@ function buildHistoryData(forecasts, daysLimit) {
           label      : fmtDt(slot.dt),
           prob       : slot.prob,
           had_alert  : slot.had_alert === true ? 1 : slot.had_alert === false ? 0 : null,
-          alertMarker: slot.had_alert === true ? slot.prob : null,
+          alertMarker: slot.had_alert === true ? 0.97 : null,
           made_at    : forecast.made_at,
         }
       }
