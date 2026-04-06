@@ -24,60 +24,56 @@ function dowCountColor(count, maxCount) {
   return '#ef4444'
 }
 
-// Обчислює зважену теплову карту з остиганням
-// Кожна тривога отримує вагу e^(-вік/tau) де tau = halflife/ln(2)
-function computeDecayHeatmap(alerts, halfLifeDays) {
-  var now  = Date.now()
-  var tau  = halfLifeDays / Math.LN2  // константа загасання
+// Обчислює теплову карту з вікном — тривоги старші за windowDays повністю ігноруються
+function computeWindowHeatmap(alerts, windowDays) {
+  var now    = Date.now()
+  var cutoff = now - windowDays * 86400000
 
-  // Зважена сума по слоту [dow][hour]
-  var slotWeight   = Array.from({ length: 7 }, function() { return Array(24).fill(0) })
-  var dowWeight    = Array(7).fill(0)
-  var slotDuration = Array.from({ length: 7 }, function() { return Array(24).fill(0) })
   var slotCount    = Array.from({ length: 7 }, function() { return Array(24).fill(0) })
+  var dowCount     = Array(7).fill(0)
+  var slotDuration = Array.from({ length: 7 }, function() { return Array(24).fill(0) })
+  var slotDurCount = Array.from({ length: 7 }, function() { return Array(24).fill(0) })
 
   alerts.forEach(function(a) {
-    var d      = new Date(a.started_at)
-    var dow    = (d.getDay() + 6) % 7
-    var hour   = d.getHours()
-    var ageDays = (now - d.getTime()) / 86400000
-    var weight  = Math.exp(-ageDays / tau)
+    var ts = new Date(a.started_at).getTime()
+    if (ts < cutoff) return
 
-    slotWeight[dow][hour] += weight
-    dowWeight[dow]        += weight
+    var d    = new Date(a.started_at)
+    var dow  = (d.getDay() + 6) % 7
+    var hour = d.getHours()
+
+    slotCount[dow][hour]++
+    dowCount[dow]++
 
     if (a.duration_minutes) {
       slotDuration[dow][hour] += a.duration_minutes
-      slotCount[dow][hour]    += 1
+      slotDurCount[dow][hour]++
     }
   })
 
-  // Максимум для нормалізації
-  var maxWeight = 0
+  var maxCount = 0
   for (var d2 = 0; d2 < 7; d2++) {
     for (var h = 0; h < 24; h++) {
-      if (slotWeight[d2][h] > maxWeight) maxWeight = slotWeight[d2][h]
+      if (slotCount[d2][h] > maxCount) maxCount = slotCount[d2][h]
     }
   }
-  var maxDowWeight = Math.max.apply(null, dowWeight) || 1
 
   return {
-    slotWeight  : slotWeight,
-    dowWeight   : dowWeight,
-    maxWeight   : maxWeight,
-    maxDowWeight: maxDowWeight,
-    slotDuration: slotDuration,
     slotCount   : slotCount,
+    dowCount    : dowCount,
+    maxCount    : maxCount,
+    slotDuration: slotDuration,
+    slotDurCount: slotDurCount,
   }
 }
 
-// Opacity для клітинки з остиганням
-function weightToOpacity(weight, maxWeight) {
-  if (weight === 0 || maxWeight === 0) return 0.03
-  return 0.1 + (weight / maxWeight) * 0.88
+// Opacity для клітинки відносно максимуму у вікні
+function countToOpacityWindow(count, maxCount) {
+  if (count === 0 || maxCount === 0) return 0.03
+  return 0.12 + (count / maxCount) * 0.83
 }
 
-// Пошук безпечних вікон у відфільтрованих за діапазоном тривогах
+
 function findSafeWindows(alerts, windowSize, searchDays) {
   var cutoff = Date.now() - searchDays * 86400000
   var recent = alerts.filter(function(a) {
@@ -159,7 +155,7 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
   var hue = regionKey === 'zhytomyr' ? '24' : '217'
 
   // Зважена карта для відображення
-  var decay    = computeDecayHeatmap(alerts || [], decayDays)
+  var decay    = computeWindowHeatmap(alerts || [], decayDays)
 
   // Повна карта для ∑ (абсолютні кількості)
   var hm       = computeHeatmap(alerts || [])
@@ -180,16 +176,16 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
         <div>
           <h2 className="chart-title">Теплова карта тривог</h2>
           <p className="chart-subtitle">
-            Остигання {decayDays} дн · яскравість = відносна свіжість
+            Вікно {decayDays} дн · тривоги поза вікном не відображаються
           </p>
         </div>
 
         <div className="hm-top-controls">
           {/* Повзунок остигання */}
           <div className="hm-decay-control">
-            <span className="sf-controls-label">Остигання</span>
+            <span className="sf-controls-label">Вікно відображення</span>
             <div className="hm-decay-row">
-              <span className="hm-decay-edge">сьогодні</span>
+              <span className="hm-decay-edge">7 дн</span>
               <input
                 type="range"
                 min={7}
@@ -289,15 +285,15 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
                 } else if (isGreen) {
                   bg = 'hsla(142, 70%, 50%, 0.65)'
                 } else {
-                  var op = weightToOpacity(
-                    decay.slotWeight[dow][cell.hour],
-                    decay.maxWeight
+                  var op = countToOpacityWindow(
+                    decay.slotCount[dow][cell.hour],
+                    decay.maxCount
                   )
                   bg = 'hsla(' + hue + ', 80%, 55%, ' + op + ')'
                 }
 
-                var dur = decay.slotCount[dow][cell.hour] > 0
-                  ? Math.round(decay.slotDuration[dow][cell.hour] / decay.slotCount[dow][cell.hour])
+                var dur = decay.slotDurCount[dow][cell.hour] > 0
+                  ? Math.round(decay.slotDuration[dow][cell.hour] / decay.slotDurCount[dow][cell.hour])
                   : 0
 
                 return (
@@ -359,7 +355,7 @@ export function HeatmapWithFinder({ alerts, regionKey }) {
       )}
 
       <p className="hm-note">
-        ∑ = загальна кількість тривог за весь час · яскравість клітинок враховує вік тривоги.
+        ∑ = загальна кількість тривог за весь час · яскравість = кількість у вікні {decayDays} дн.
         {isActive && ' Пошук вікон — тривоги без ' + searchDays + ' дн.'}
       </p>
     </div>
