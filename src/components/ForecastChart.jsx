@@ -136,17 +136,19 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
   var liveData = []
   if (mode === 'forecast') {
     var forecast = computeForecast(alerts, 6)
-    liveData = forecast.slots.map(function(s) {
-      return {
-        label    : s.label,
-        prob     : s.adjustedProbability,
-        ciLo     : s.ciLow,
-        ciHi     : s.ciHigh,
-        observed : s.observed,
-        hits     : s.hits,
-        had_alert: null,
-      }
-    })
+    liveData = forecast.slots
+      .filter(function(s) { return s.adjustedProbability >= 0.5 })
+      .map(function(s) {
+        return {
+          label    : s.label,
+          prob     : s.adjustedProbability,
+          ciLo     : s.ciLow,
+          ciHi     : s.ciHigh,
+          observed : s.observed,
+          hits     : s.hits,
+          had_alert: null,
+        }
+      })
   }
 
   // Історія прогнозів
@@ -172,7 +174,7 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
           </h2>
           <p className="chart-subtitle">
             {mode === 'forecast'
-              ? 'Статистична імовірність · скоригована на інтервал'
+              ? 'Показано слоти з імовірністю ≥ 50% · ' + (liveData.length === 0 ? 'немає прогнозів' : liveData.length + ' з 6 год')
               : 'Прогноз vs реальні тривоги · ' + RANGE_OPTIONS[rangeIdx].label}
           </p>
         </div>
@@ -247,7 +249,7 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
         <div className="fc-empty">
           {mode === 'history'
             ? 'Немає збережених прогнозів за цей період. Дані накопичуються щодня.'
-            : 'Немає даних для прогнозу.'}
+            : 'Немає слотів з імовірністю ≥ 50% · наступні 6 годин відносно спокійні за статистикою.'}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={260}>

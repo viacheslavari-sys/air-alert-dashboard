@@ -184,8 +184,10 @@ jobs:
             return { made_at: now.toISOString(), slots: slots }
           }
 
-          existing.forecasts.kyiv.push(makeForecast(kyivAll, 'kyiv'))
-          existing.forecasts.zhytomyr.push(makeForecast(zhytomyrAll, 'zhytomyr'))
+          var kyivForecast     = makeForecast(kyivAll)
+          var zhytomyrForecast = makeForecast(zhytomyrAll)
+          if (kyivForecast)     existing.forecasts.kyiv.push(kyivForecast)
+          if (zhytomyrForecast) existing.forecasts.zhytomyr.push(zhytomyrForecast)
 
           // Тримаємо останні 90 прогнозів (90 днів)
           if (existing.forecasts.kyiv.length > 90)
