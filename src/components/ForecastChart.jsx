@@ -98,30 +98,56 @@ function buildHistoryData(forecasts, daysLimit) {
 }
 
 // Рахує метрики якості прогнозу
-// Всі збережені слоти мають prob >= 0.5 (ми зберігаємо тільки їх)
-// Тому predicted = 1 для всіх рядків з prob
-function calcAccuracy(rows) {
+function calcAccuracy(rows, hourlyActuals) {
   var known = rows.filter(function(r) { return r.had_alert !== null })
   if (known.length === 0) return null
 
-  // Всі збережені слоти — це прогнози "буде тривога" (prob >= 0.5)
   var truePos  = known.filter(function(r) { return r.had_alert === 1 }).length
   var falsePos = known.filter(function(r) { return r.had_alert === 0 }).length
+  var precision = known.length > 0 ? Math.round(truePos / known.length * 100) : 0
 
-  // Precision: з тих що передбачили — скільки справді було
-  var precision = known.length > 0
-    ? Math.round(truePos / known.length * 100)
-    : 0
+  // Recall: з усіх реальних тривог скільки ми передбачили
+  // Потрібен hourlyActuals — погодинний журнал реальних тривог
+  var recall = null
+  var falseNeg = null
+  if (hourlyActuals) {
+    // Збираємо всі прогнозовані слоти (дата+година)
+    var predictedSet = {}
+    rows.forEach(function(r) {
+      var key = r.dt ? r.dt.slice(0, 13) : null
+      if (key) predictedSet[key] = true
+    })
+
+    // Рахуємо скільки реальних тривог ми пропустили (не прогнозували)
+    var totalRealAlerts = 0
+    var missedAlerts    = 0
+    Object.keys(hourlyActuals).forEach(function(day) {
+      var hours = hourlyActuals[day]
+      hours.forEach(function(hadAlert, hour) {
+        if (hadAlert !== 1) return
+        totalRealAlerts++
+        var key = day + 'T' + String(hour).padStart(2, '0')
+        if (!predictedSet[key]) missedAlerts++
+      })
+    })
+
+    falseNeg = missedAlerts
+    recall   = totalRealAlerts > 0
+      ? Math.round((totalRealAlerts - missedAlerts) / totalRealAlerts * 100)
+      : null
+  }
 
   return {
     truePos  : truePos,
     falsePos : falsePos,
+    falseNeg : falseNeg,
     total    : known.length,
     precision: precision,
+    recall   : recall,
   }
 }
 
-export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
+export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyActuals }) {
   var regionKey = regionKeys[0]
   var alerts    = alertsMap[regionKey] || []
 
@@ -160,7 +186,7 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
     : []
   if (mode === 'history') {
     historyData = buildHistoryData(savedForecasts, RANGE_OPTIONS[rangeIdx].days)
-    accuracy    = calcAccuracy(historyData)
+    accuracy    = calcAccuracy(historyData, hourlyActuals)
   }
 
   var chartData  = mode === 'forecast' ? liveData : historyData
@@ -237,9 +263,19 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
               <span className="fc-acc-desc">тривоги не було</span>
             </div>
           </div>
-          <p className="fc-acc-note">
-            Recall (пропущені тривоги) буде доступний після інтеграції повного журналу тихих годин.
-          </p>
+          {accuracy.recall !== null && (
+            <div className="fc-acc-cell fc-acc-cell--bad" style={{ gridColumn: '1 / -1' }}>
+              <span className="fc-acc-num">{accuracy.falseNeg}</span>
+              <span className="fc-acc-desc">
+                пропущених тривог · Recall {accuracy.recall}%
+              </span>
+            </div>
+          )}
+          {accuracy.recall === null && (
+            <p className="fc-acc-note">
+              Recall з'явиться після наступного запуску Action — потрібен hourly_actuals.
+            </p>
+          )}
         </div>
       )}
 

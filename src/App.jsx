@@ -16,6 +16,7 @@ export default function App() {
   var historyDays     = _data.historyDays
   var forecastHistory = _data.forecastHistory
   var dailyCounts     = _data.dailyCounts
+  var hourlyActuals   = _data.hourlyActuals
 
   var _region      = useState('kyiv')
   var selectedRegion = _region[0]
@@ -103,6 +104,7 @@ export default function App() {
               alertsMap={{ [selectedRegion]: current.alerts }}
               regionKeys={[selectedRegion]}
               forecastHistory={forecastHistory}
+              hourlyActuals={hourlyActuals && hourlyActuals[selectedRegion]}
             />
             <DailyAlertsChart
               alerts={current.alerts}
