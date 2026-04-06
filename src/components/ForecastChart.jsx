@@ -119,35 +119,33 @@ function calcAccuracy(rows, hourlyActuals) {
       if (key) predictedSet[key] = true
     })
 
-    // Визначаємо дату першого прогнозу — Recall рахуємо тільки від неї
-    var firstForecastDate = null
+    // Визначаємо точний час першого прогнозного слоту
+    var firstForecastDt = null
     rows.forEach(function(r) {
       if (!r.dt) return
-      var d = r.dt.slice(0, 10)
-      if (!firstForecastDate || d < firstForecastDate) firstForecastDate = d
+      if (!firstForecastDt || r.dt < firstForecastDt) firstForecastDt = r.dt
     })
 
     // Визначаємо дні де прогнози вже оцінені (had_alert !== null)
-    // і не раніше першого прогнозу
     var evaluatedDates = {}
     rows.forEach(function(r) {
       if (r.dt && r.had_alert !== null) {
-        var d = r.dt.slice(0, 10)
-        if (!firstForecastDate || d >= firstForecastDate) {
-          evaluatedDates[d] = true
-        }
+        evaluatedDates[r.dt.slice(0, 10)] = true
       }
     })
 
-    // Рахуємо скільки реальних тривог ми пропустили (не прогнозували)
-    // Тільки в днях де прогнози вже оцінені
+    // Рахуємо скільки реальних тривог ми пропустили
+    // Тільки слоти що відбулись ПІСЛЯ першого прогнозу і в оцінених днях
     var totalRealAlerts = 0
     var missedAlerts    = 0
     Object.keys(hourlyActuals).forEach(function(day) {
-      if (!evaluatedDates[day]) return  // пропускаємо дні без оцінених прогнозів
+      if (!evaluatedDates[day]) return
       var hours = hourlyActuals[day]
       hours.forEach(function(hadAlert, hour) {
         if (hadAlert !== 1) return
+        var slotDt = day + 'T' + String(hour).padStart(2, '0') + ':00:00.000Z'
+        // Ігноруємо тривоги що були до першого прогнозу
+        if (firstForecastDt && slotDt < firstForecastDt) return
         totalRealAlerts++
         var key = day + 'T' + String(hour).padStart(2, '0')
         if (!predictedSet[key]) missedAlerts++
