@@ -84,11 +84,12 @@ function buildHistoryData(forecasts, daysLimit) {
       var key = slot.dt.slice(0, 13) // округлюємо до години
       if (!byDt[key] || new Date(forecast.made_at) > new Date(byDt[key].made_at)) {
         byDt[key] = {
-          dt       : slot.dt,
-          label    : fmtDt(slot.dt),
-          prob     : slot.prob,
-          had_alert: slot.had_alert === true ? 1 : slot.had_alert === false ? 0 : null,
-          made_at  : forecast.made_at,
+          dt         : slot.dt,
+          label      : fmtDt(slot.dt),
+          prob       : slot.prob,
+          had_alert  : slot.had_alert === true ? 1 : slot.had_alert === false ? 0 : null,
+          alertMarker: slot.had_alert === true ? slot.prob : null,
+          made_at    : forecast.made_at,
         }
       }
     })
@@ -333,30 +334,29 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
               })}
             </Bar>
 
-            {/* Реальні тривоги — тільки в режимі history */}
+            {/* Реальні тривоги — маркери на рівні прогнозу */}
             {mode === 'history' && (
               <Line
-                dataKey="had_alert"
+                dataKey="alertMarker"
                 name="Реальна тривога"
-                type="step"
-                stroke="#ef4444"
-                strokeWidth={2}
+                stroke="none"
                 dot={function(props) {
-                  var val = props.payload && props.payload.had_alert
-                  if (val !== 1) return null
+                  var row = props.payload
+                  if (!row || row.had_alert !== 1) return null
                   return (
                     <circle
-                      key={props.key || props.index}
+                      key={props.index}
                       cx={props.cx}
                       cy={props.cy}
-                      r={4}
+                      r={5}
                       fill="#ef4444"
-                      stroke="none"
+                      stroke="#1a1a2e"
+                      strokeWidth={1.5}
                     />
                   )
                 }}
-                activeDot={{ r: 5, fill: '#ef4444' }}
-                connectNulls={false}
+                activeDot={false}
+                isAnimationActive={false}
               />
             )}
           </ComposedChart>

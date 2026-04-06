@@ -207,20 +207,21 @@ jobs:
             // Для кожного дня і години — чи була тривога
             const byDayHour = {}
             filtered.forEach(function(a) {
-              const day  = a.started_at.slice(0, 10)
-              const hour = new Date(a.started_at).getHours()
+              // Використовуємо UTC щоб збігатися з форматом прогнозів
+              const start = new Date(a.started_at)
+              const day   = start.toISOString().slice(0, 10)
+              const hour  = start.getUTCHours()
               if (!byDayHour[day]) byDayHour[day] = {}
               byDayHour[day][hour] = 1
 
-              // Якщо тривога тривала кілька годин — позначаємо всі години
+              // Якщо тривога тривала кілька годин — позначаємо всі UTC години
               if (a.finished_at) {
-                const start = new Date(a.started_at)
-                const end   = new Date(a.finished_at)
+                const end = new Date(a.finished_at)
                 let cur = new Date(start)
-                cur.setMinutes(0, 0, 0)
+                cur.setUTCMinutes(0, 0, 0)
                 while (cur <= end) {
                   const d = cur.toISOString().slice(0, 10)
-                  const h = cur.getHours()
+                  const h = cur.getUTCHours()
                   if (!byDayHour[d]) byDayHour[d] = {}
                   byDayHour[d][h] = 1
                   cur = new Date(cur.getTime() + 3600000)
@@ -238,11 +239,11 @@ jobs:
             while (cur <= today) {
               const key  = cur.toISOString().slice(0, 10)
               const hours = byDayHour[key] || {}
-              // 24 значення: 1 або 0 для кожної години
+              // 24 значення: 1 або 0 для кожної UTC години
               result[key] = Array.from({ length: 24 }, function(_, h) {
                 return hours[h] ? 1 : 0
               })
-              cur.setDate(cur.getDate() + 1)
+              cur.setUTCDate(cur.getUTCDate() + 1)
             }
             return result
           }
