@@ -107,9 +107,8 @@ export default function App() {
               hourlyActuals={hourlyActuals && hourlyActuals[selectedRegion]}
             />
             <DailyAlertsChart
-              alerts={current.alerts}
-              regionKey={selectedRegion}
-              dailyCounts={dailyCounts && dailyCounts[selectedRegion]}
+              alertsMap={{ kyiv: kyiv && kyiv.alerts, zhytomyr: zhytomyr && zhytomyr.alerts }}
+              dailyCounts={dailyCounts}
             />
           </>
         )}
