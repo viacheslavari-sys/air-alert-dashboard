@@ -119,12 +119,23 @@ function calcAccuracy(rows, hourlyActuals) {
       if (key) predictedSet[key] = true
     })
 
+    // Визначаємо дату першого прогнозу — Recall рахуємо тільки від неї
+    var firstForecastDate = null
+    rows.forEach(function(r) {
+      if (!r.dt) return
+      var d = r.dt.slice(0, 10)
+      if (!firstForecastDate || d < firstForecastDate) firstForecastDate = d
+    })
+
     // Визначаємо дні де прогнози вже оцінені (had_alert !== null)
-    // Тільки такі дні рахуємо в Recall — уникаємо сьогоднішніх неоцінених прогнозів
+    // і не раніше першого прогнозу
     var evaluatedDates = {}
     rows.forEach(function(r) {
       if (r.dt && r.had_alert !== null) {
-        evaluatedDates[r.dt.slice(0, 10)] = true
+        var d = r.dt.slice(0, 10)
+        if (!firstForecastDate || d >= firstForecastDate) {
+          evaluatedDates[d] = true
+        }
       }
     })
 
