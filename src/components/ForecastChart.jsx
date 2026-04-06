@@ -41,6 +41,20 @@ function ForecastTooltip({ active, payload }) {
           </div>
         )
       })}
+      {row.ciLo != null && (
+        <div className="tooltip-row">
+          <span className="tooltip-label">90% інтервал</span>
+          <span className="tooltip-value">
+            {Math.round(row.ciLo * 100)}–{Math.round(row.ciHi * 100)}%
+          </span>
+        </div>
+      )}
+      {row.observed != null && (
+        <div className="tooltip-row">
+          <span className="tooltip-label">Підстава</span>
+          <span className="tooltip-value">{row.hits} з {row.observed} тижнів</span>
+        </div>
+      )}
       {row.made_at && (
         <div className="tooltip-row">
           <span className="tooltip-label">Прогноз зроблено</span>
@@ -128,6 +142,8 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
         prob     : s.adjustedProbability,
         ciLo     : s.ciLow,
         ciHi     : s.ciHigh,
+        observed : s.observed,
+        hits     : s.hits,
         had_alert: null,
       }
     })

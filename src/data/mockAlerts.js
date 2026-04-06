@@ -230,74 +230,90 @@ export function computeHeatmap(alerts) {
   }
 }
 
-export function computeForecast(alerts, hoursAhead = 6) {
-  const heatmap = computeHeatmap(alerts)
+export function computeForecast(alerts, hoursAhead) {
+  if (!hoursAhead) hoursAhead = 6
 
-  // Час останньої тривоги
-  const sorted = [...alerts].sort(
-    (a, b) => new Date(b.started_at) - new Date(a.started_at)
-  )
-  const lastAlert = sorted[0] ? new Date(sorted[0].started_at) : null
+  // ── Будуємо таблицю умовних імовірностей ─────────────────────────
+  // P(тривога | dow, hour) = кількість унікальних дат з тривогою в цей слот
+  //                         / загальна кількість таких днів тижня у вибірці
 
-  // Середній інтервал між тривогами (години)
-  let avgIntervalHours = null
-  if (sorted.length > 1) {
-    const intervals = []
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const diff =
-        (new Date(sorted[i].started_at) - new Date(sorted[i + 1].started_at)) /
-        3600000
-      if (diff > 0 && diff < 72) intervals.push(diff) // ігноруємо аномальні паузи
-    }
-    if (intervals.length > 0) {
-      avgIntervalHours =
-        intervals.reduce((s, v) => s + v, 0) / intervals.length
-    }
+  // Підраховуємо скільки разів кожен день тижня зустрівся у вибірці
+  var dowObserved = Array(7).fill(0)
+  var datesSeen   = new Set()
+  alerts.forEach(function(a) {
+    var dateKey = a.started_at.slice(0, 10)
+    if (datesSeen.has(dateKey)) return
+    datesSeen.add(dateKey)
+    var d   = new Date(a.started_at)
+    var dow = (d.getDay() + 6) % 7
+    dowObserved[dow]++
+  })
+
+  // Підраховуємо унікальні дати з тривогою для кожного слоту [dow][hour]
+  var slotDates = Array.from({ length: 7 }, function() {
+    return Array.from({ length: 24 }, function() { return new Set() })
+  })
+  alerts.forEach(function(a) {
+    var d       = new Date(a.started_at)
+    var dow     = (d.getDay() + 6) % 7
+    var hour    = d.getHours()
+    var dateKey = a.started_at.slice(0, 10)
+    slotDates[dow][hour].add(dateKey)
+  })
+
+  // Умовна імовірність для кожного слоту
+  // Використовуємо згладжування Лапласа (+1/+2) щоб уникнути 0% і 100%
+  // при малій кількості спостережень
+  function slotProb(dow, hour) {
+    var observed = dowObserved[dow]
+    if (observed === 0) return 0
+    var hits = slotDates[dow][hour].size
+    // Лапласівське згладжування: (hits + 0.5) / (observed + 1)
+    return (hits + 0.5) / (observed + 1)
   }
 
-  const now = new Date()
-  const slots = []
+  // ── Остання тривога для контекстної корекції ──────────────────────
+  var sorted = alerts.slice().sort(function(a, b) {
+    return new Date(b.started_at) - new Date(a.started_at)
+  })
+  var lastAlert = sorted[0] ? new Date(sorted[0].started_at) : null
 
-  for (let i = 1; i <= hoursAhead; i++) {
-    const future = new Date(now.getTime() + i * 3600000)
-    const dow  = (future.getDay() + 6) % 7
-    const hour = future.getHours()
+  // ── Генеруємо слоти ───────────────────────────────────────────────
+  var now   = new Date()
+  var slots = []
 
-    // Нормалізована відносна імовірність (0..1) на базі абсолютних кількостей
-    const maxCount = heatmap.maxSlotCount || 1
-    const slotCount = heatmap.cells[dow][hour].count
-    const baseProbability = slotCount / maxCount
+  for (var i = 1; i <= hoursAhead; i++) {
+    var future = new Date(now.getTime() + i * 3600000)
+    future.setMinutes(0, 0, 0)
+    var dow  = (future.getDay() + 6) % 7
+    var hour = future.getHours()
 
-    // Корекція на інтервал
-    let adjustedProbability = baseProbability
-    if (lastAlert && avgIntervalHours) {
-      const hoursSinceLast = (now - lastAlert) / 3600000 + i
-      const intervalRatio  = hoursSinceLast / avgIntervalHours
-      const correction = 0.8 + 0.5 / (1 + Math.exp(-2 * (intervalRatio - 1)))
-      adjustedProbability = Math.min(baseProbability * correction, 0.95)
-    }
+    var prob = slotProb(dow, hour)
 
-    // Довірчий інтервал — спрощений на базі кількості спостережень
-    const n = heatmap.dowTotals[dow] || 1
-    const p = baseProbability
-    const z = 1.645
-    const margin = z * Math.sqrt((p * (1 - p)) / n)
+    // Довірчий інтервал Вілсона (точніший ніж нормальне наближення)
+    var n = dowObserved[dow] + 1  // з урахуванням згладжування
+    var z = 1.645  // 90% CI
+    var p = prob
+    var margin = n > 0 ? z * Math.sqrt((p * (1 - p)) / n) : 0.15
 
     slots.push({
-      hour        : future.getHours(),
-      dow         : dow,
-      dayLabel    : heatmap.cells[dow][hour].day,
-      label       : future.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }),
-      fullLabel   : future.toLocaleDateString('uk-UA', { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
-      baseProbability,
-      adjustedProbability,
-      ciLow       : Math.max(0, adjustedProbability - margin),
-      ciHigh      : Math.min(1, adjustedProbability + margin),
-      hoursFromNow: i,
-      avgIntervalHours,
-      hoursSinceLast: lastAlert ? (now - lastAlert) / 3600000 : null,
+      hour             : future.getHours(),
+      dow              : dow,
+      label            : future.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }),
+      fullLabel        : future.toLocaleDateString('uk-UA', { weekday: 'short' }) +
+                         ' ' + future.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }),
+      baseProbability  : prob,
+      adjustedProbability: prob,  // поки без додаткових корекцій
+      ciLow            : Math.max(0, prob - margin),
+      ciHigh           : Math.min(1, prob + margin),
+      observed         : dowObserved[dow],
+      hits             : slotDates[dow][hour].size,
     })
   }
 
-  return { slots, avgIntervalHours, lastAlert: lastAlert ? lastAlert.toISOString() : null }
+  return {
+    slots          : slots,
+    avgIntervalHours: null,
+    lastAlert      : lastAlert ? lastAlert.toISOString() : null,
+  }
 }

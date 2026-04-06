@@ -133,47 +133,55 @@ jobs:
 
           // ── Генеруємо прогноз на наступні 6 годин ────────────────────
           // Використовуємо просту статистику по годинах з накопичених даних
-          function computeHourlyStats(alerts) {
-            const hourCount = Array(24).fill(0)
-            const hourDays  = Array.from({ length: 24 }, function() { return new Set() })
+          function makeForecast(alerts) {
+            const now = new Date()
 
+            // Підраховуємо скільки разів кожен dow зустрівся у вибірці
+            const dowObserved = Array(7).fill(0)
+            const datesSeen   = new Set()
             alerts.forEach(function(a) {
+              const dateKey = a.started_at.slice(0, 10)
+              if (datesSeen.has(dateKey)) return
+              datesSeen.add(dateKey)
               const d   = new Date(a.started_at)
-              const h   = d.getUTCHours()
-              const day = a.started_at.slice(0, 10)
-              hourDays[h].add(day)
-              hourCount[h]++
+              const dow = (d.getDay() + 6) % 7
+              dowObserved[dow]++
             })
 
-            const totalDays = 30
-            return hourCount.map(function(count, h) {
-              return { hour: h, count: count, prob: hourDays[h].size / totalDays }
+            // Унікальні дати з тривогою для кожного слоту [dow][hour]
+            const slotDates = Array.from({ length: 7 }, function() {
+              return Array.from({ length: 24 }, function() { return new Set() })
             })
-          }
+            alerts.forEach(function(a) {
+              const d       = new Date(a.started_at)
+              const dow     = (d.getDay() + 6) % 7
+              const hour    = d.getHours()
+              const dateKey = a.started_at.slice(0, 10)
+              slotDates[dow][hour].add(dateKey)
+            })
 
-          function makeForecast(alerts, regionKey) {
-            const stats   = computeHourlyStats(alerts)
-            const maxCount = Math.max.apply(null, stats.map(function(s) { return s.count })) || 1
-            const now     = new Date()
-            const slots   = []
+            // Умовна імовірність з Лапласівським згладжуванням
+            function slotProb(dow, hour) {
+              const observed = dowObserved[dow]
+              if (observed === 0) return 0
+              const hits = slotDates[dow][hour].size
+              return Math.round(((hits + 0.5) / (observed + 1)) * 100) / 100
+            }
 
+            const slots = []
             for (let i = 1; i <= 6; i++) {
               const future = new Date(now.getTime() + i * 3600000)
               future.setMinutes(0, 0, 0)
-              const h    = future.getUTCHours()
-              const prob = stats[h].count / maxCount
-
+              const dow  = (future.getDay() + 6) % 7
+              const hour = future.getHours()
               slots.push({
                 dt       : future.toISOString(),
-                prob     : Math.round(prob * 100) / 100,
+                prob     : slotProb(dow, hour),
                 had_alert: null,
               })
             }
 
-            return {
-              made_at: now.toISOString(),
-              slots  : slots,
-            }
+            return { made_at: now.toISOString(), slots: slots }
           }
 
           existing.forecasts.kyiv.push(makeForecast(kyivAll, 'kyiv'))
