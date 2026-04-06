@@ -395,25 +395,23 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
               })}
             </Bar>
 
-            {/* Реальні тривоги — маркери на рівні прогнозу */}
+            {/* Пропущені тривоги — хрестики внизу */}
             {mode === 'history' && (
               <Line
-                dataKey="alertMarker"
-                name="Реальна тривога"
+                dataKey="missedAlert"
+                name="Пропущена тривога"
                 stroke="none"
                 dot={function(props) {
                   var row = props.payload
-                  if (!row || row.had_alert !== 1) return null
+                  if (!row || row.missedAlert == null) return null
+                  var cx = props.cx
+                  var cy = props.cy
+                  var r  = 5
                   return (
-                    <circle
-                      key={props.index}
-                      cx={props.cx}
-                      cy={props.cy}
-                      r={5}
-                      fill="#ef4444"
-                      stroke="#1a1a2e"
-                      strokeWidth={1.5}
-                    />
+                    <g key={props.index}>
+                      <line x1={cx-r} y1={cy-r} x2={cx+r} y2={cy+r} stroke="#f97316" strokeWidth={2.5} />
+                      <line x1={cx+r} y1={cy-r} x2={cx-r} y2={cy+r} stroke="#f97316" strokeWidth={2.5} />
+                    </g>
                   )
                 }}
                 activeDot={false}
@@ -428,7 +426,7 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
       <p className="hm-note">
         {mode === 'forecast'
           ? 'Засновано на статистиці за ' + (alerts.length > 0 ? 'зібраний період' : '30 днів') + '. Не є оперативним прогнозом.'
-          : 'Стовпці = прогноз · 🔴 крапка на вершині = тривога справді була'}
+          : 'Стовпці = прогноз (≥50%) · ✕ помаранчевий = пропущена тривога (не прогнозувалась)'}
       </p>
     </div>
   )
