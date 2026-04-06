@@ -83,12 +83,12 @@ function mergeAlerts(fresh, accumulated) {
   })
 }
 
-function buildRegionState(alerts) {
+function buildRegionState(alerts, historyDays) {
   return {
     alerts    : alerts,
     hourlyData: computeHourlyProbability(alerts),
     dailyData : computeDailyAlerts(alerts),
-    stats     : computeSummaryStats(alerts),
+    stats     : computeSummaryStats(alerts, historyDays),
   }
 }
 
@@ -149,8 +149,8 @@ export function useAlertsData() {
           loading        : false,
           error          : null,
           isMock         : false,
-          kyiv           : buildRegionState(kyivAll),
-          zhytomyr       : buildRegionState(zhytomyrAll),
+          kyiv           : buildRegionState(kyivAll, daysCollected),
+          zhytomyr       : buildRegionState(zhytomyrAll, daysCollected),
           historyDays    : daysCollected,
           forecastHistory: accumulated && accumulated.forecasts ? accumulated.forecasts : null,
           dailyCounts    : accumulated && accumulated.daily_counts ? accumulated.daily_counts : null,

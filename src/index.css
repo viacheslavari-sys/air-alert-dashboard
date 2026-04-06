@@ -1348,3 +1348,17 @@ body {
   line-height: 1.5;
   grid-column: 1 / -1;
 }
+
+/* ── StatsCards updates ── */
+.stat-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.stat-card--alert {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.05);
+}

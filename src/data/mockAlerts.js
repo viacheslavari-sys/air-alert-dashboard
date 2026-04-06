@@ -118,23 +118,34 @@ export function computeDailyAlerts(alerts) {
   return Object.values(byDay)
 }
 
-export function computeSummaryStats(alerts) {
-  const total = alerts.length
-  if (total === 0) return { total: 0, avgDuration: 0, maxDuration: 0, minDuration: 0, daysWithAlerts: 0 }
+export function computeSummaryStats(alerts, historyDays) {
+  var total = alerts.length
+  if (total === 0) return {
+    total: 0, todayCount: 0, weekCount: 0,
+    daysWithAlerts: 0, totalDays: historyDays || 30,
+  }
 
-  const durations = alerts.map((a) => a.duration_minutes || 0)
-  const avgDuration = Math.round(durations.reduce((s, d) => s + d, 0) / total)
-  const maxDuration = Math.max(...durations)
-  const minDuration = Math.min(...durations)
+  var now     = new Date()
+  var todayUTC = now.toISOString().slice(0, 10)
+  var weekAgo  = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10)
 
-  const days = new Set(alerts.map((a) => a.started_at.slice(0, 10)))
+  var todayCount = 0
+  var weekCount  = 0
+  var days = new Set()
+
+  alerts.forEach(function(a) {
+    var day = a.started_at.slice(0, 10)
+    days.add(day)
+    if (day === todayUTC) todayCount++
+    if (day >= weekAgo)   weekCount++
+  })
 
   return {
-    total,
-    avgDuration,
-    maxDuration,
-    minDuration,
+    total         : total,
+    todayCount    : todayCount,
+    weekCount     : weekCount,
     daysWithAlerts: days.size,
+    totalDays     : historyDays || 30,
   }
 }
 
