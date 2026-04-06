@@ -83,6 +83,29 @@ function buildHistoryData(forecasts, daysLimit) {
   return Object.values(byDt).sort(function(a, b) { return new Date(a.dt) - new Date(b.dt) })
 }
 
+// Рахує точність прогнозу по порогу 0.5
+function calcAccuracy(rows) {
+  var total   = 0
+  var correct = 0
+  rows.forEach(function(row) {
+    if (row.had_alert === null) return  // ще не відомо
+    total++
+    var predicted = row.prob >= 0.5 ? 1 : 0
+    if (predicted === row.had_alert) correct++
+  })
+  if (total === 0) return null
+  return {
+    correct : correct,
+    total   : total,
+    pct     : Math.round(correct / total * 100),
+    // Скільки разів прогноз казав "буде" і справді було
+    truePos : rows.filter(function(r) { return r.had_alert === 1 && r.prob >= 0.5 }).length,
+    falsePos: rows.filter(function(r) { return r.had_alert === 0 && r.prob >= 0.5 }).length,
+    trueNeg : rows.filter(function(r) { return r.had_alert === 0 && r.prob < 0.5  }).length,
+    falseNeg: rows.filter(function(r) { return r.had_alert === 1 && r.prob < 0.5  }).length,
+  }
+}
+
 export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
   var regionKey = regionKeys[0]
   var alerts    = alertsMap[regionKey] || []
@@ -112,11 +135,13 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
 
   // Історія прогнозів
   var historyData = []
+  var accuracy    = null
   var savedForecasts = forecastHistory && forecastHistory[regionKey]
     ? forecastHistory[regionKey]
     : []
   if (mode === 'history') {
     historyData = buildHistoryData(savedForecasts, RANGE_OPTIONS[rangeIdx].days)
+    accuracy    = calcAccuracy(historyData)
   }
 
   var chartData  = mode === 'forecast' ? liveData : historyData
@@ -173,6 +198,34 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
           )}
         </div>
       </div>
+
+      {/* ── Точність в режимі history ── */}
+      {mode === 'history' && accuracy && (
+        <div className="fc-accuracy">
+          <div className="fc-acc-main">
+            <span className="fc-acc-value">{accuracy.pct}%</span>
+            <span className="fc-acc-label">точність · {accuracy.correct} з {accuracy.total} слотів</span>
+          </div>
+          <div className="fc-acc-grid">
+            <div className="fc-acc-cell fc-acc-cell--good">
+              <span className="fc-acc-num">{accuracy.truePos}</span>
+              <span className="fc-acc-desc">вгадав тривогу</span>
+            </div>
+            <div className="fc-acc-cell fc-acc-cell--bad">
+              <span className="fc-acc-num">{accuracy.falsePos}</span>
+              <span className="fc-acc-desc">хибна тривога</span>
+            </div>
+            <div className="fc-acc-cell fc-acc-cell--bad">
+              <span className="fc-acc-num">{accuracy.falseNeg}</span>
+              <span className="fc-acc-desc">пропущена тривога</span>
+            </div>
+            <div className="fc-acc-cell fc-acc-cell--good">
+              <span className="fc-acc-num">{accuracy.trueNeg}</span>
+              <span className="fc-acc-desc">вгадав тишу</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {chartData.length === 0 ? (
         <div className="fc-empty">
