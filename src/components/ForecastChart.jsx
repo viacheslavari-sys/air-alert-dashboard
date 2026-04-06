@@ -62,21 +62,25 @@ function buildHistoryData(forecasts, daysLimit) {
     ? new Date(Date.now() - daysLimit * 86400000)
     : new Date(0)
 
-  const rows = []
+  // Дедублікуємо по dt — беремо останній прогноз для кожного часового слоту
+  var byDt = {}
   forecasts.forEach(function(forecast) {
     if (new Date(forecast.made_at) < cutoff) return
     forecast.slots.forEach(function(slot) {
-      rows.push({
-        dt       : slot.dt,
-        label    : fmtDt(slot.dt),
-        prob     : slot.prob,
-        had_alert: slot.had_alert === true ? 1 : slot.had_alert === false ? 0 : null,
-        made_at  : forecast.made_at,
-      })
+      var key = slot.dt.slice(0, 13) // округлюємо до години
+      if (!byDt[key] || new Date(forecast.made_at) > new Date(byDt[key].made_at)) {
+        byDt[key] = {
+          dt       : slot.dt,
+          label    : fmtDt(slot.dt),
+          prob     : slot.prob,
+          had_alert: slot.had_alert === true ? 1 : slot.had_alert === false ? 0 : null,
+          made_at  : forecast.made_at,
+        }
+      }
     })
   })
 
-  return rows.sort(function(a, b) { return new Date(a.dt) - new Date(b.dt) })
+  return Object.values(byDt).sort(function(a, b) { return new Date(a.dt) - new Date(b.dt) })
 }
 
 export function ForecastChart({ alertsMap, regionKeys, forecastHistory }) {
