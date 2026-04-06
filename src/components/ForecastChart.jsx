@@ -198,10 +198,16 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
     : []
   if (mode === 'history') {
     historyData = buildHistoryData(savedForecasts, RANGE_OPTIONS[rangeIdx].days)
-    accuracy    = calcAccuracy(historyData, hourlyActuals)
+    // Для метрик точності беремо тільки слоти з prob >= 0.5
+    var evaluatedRows = historyData.filter(function(r) { return r.prob >= 0.5 })
+    accuracy = calcAccuracy(evaluatedRows, hourlyActuals)
   }
 
-  var chartData  = mode === 'forecast' ? liveData : historyData
+  // В режимі history показуємо тільки слоти >= 50% щоб графік відповідав метрикам
+  var displayData = mode === 'history'
+    ? historyData.filter(function(r) { return r.prob >= 0.5 })
+    : historyData
+  var chartData  = mode === 'forecast' ? liveData : displayData
   var hasHistory = savedForecasts.length > 0
 
   return (
