@@ -276,12 +276,16 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
             </div>
           </div>
           {accuracy.recall !== null && (
-            <div className="fc-acc-cell fc-acc-cell--bad" style={{ gridColumn: '1 / -1' }}>
-              <span className="fc-acc-num">{accuracy.falseNeg}</span>
-              <span className="fc-acc-desc">
-                пропущених тривог · Recall {accuracy.recall}%
-              </span>
-            </div>
+            <>
+              <div className="fc-acc-cell fc-acc-cell--good">
+                <span className="fc-acc-num">{accuracy.recall}%</span>
+                <span className="fc-acc-desc">recall · знайдено тривог</span>
+              </div>
+              <div className="fc-acc-cell fc-acc-cell--bad">
+                <span className="fc-acc-num">{accuracy.falseNeg}</span>
+                <span className="fc-acc-desc">пропущено тривог</span>
+              </div>
+            </>
           )}
           {accuracy.recall === null && (
             <p className="fc-acc-note">
