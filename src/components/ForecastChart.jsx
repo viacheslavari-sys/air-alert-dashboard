@@ -421,29 +421,6 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
               />
             )}
 
-            {/* Пропущені тривоги — хрестики внизу */}
-            {mode === 'history' && (
-              <Line
-                dataKey="missedAlert"
-                name="Пропущена тривога"
-                stroke="none"
-                dot={function(props) {
-                  var row = props.payload
-                  if (!row || row.missedAlert == null) return null
-                  var cx = props.cx
-                  var cy = props.cy
-                  var r  = 5
-                  return (
-                    <g key={props.index}>
-                      <line x1={cx-r} y1={cy-r} x2={cx+r} y2={cy+r} stroke="#f97316" strokeWidth={2} />
-                      <line x1={cx+r} y1={cy-r} x2={cx-r} y2={cy+r} stroke="#f97316" strokeWidth={2} />
-                    </g>
-                  )
-                }}
-                activeDot={false}
-                isAnimationActive={false}
-              />
-            )}
           </ComposedChart>
         </ResponsiveContainer>
       )}
@@ -451,7 +428,7 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
       <p className="hm-note">
         {mode === 'forecast'
           ? 'Засновано на статистиці за ' + (alerts.length > 0 ? 'зібраний період' : '30 днів') + '. Не є оперативним прогнозом.'
-          : 'Стовпці = прогноз · 🔴 крапка = тривога була · ✕ = пропущена тривога (не прогнозувалась)'}
+          : 'Стовпці = прогноз · 🔴 крапка на вершині = тривога справді була'}
       </p>
     </div>
   )
