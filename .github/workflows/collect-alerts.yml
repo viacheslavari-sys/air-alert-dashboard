@@ -58,6 +58,17 @@ jobs:
           node << 'NODEEOF'
           const fs = require('fs')
 
+          // Хелпер: конвертує Date в київський час
+          function toKyiv(date) {
+            return new Date(date.toLocaleString('en-US', { timeZone: 'Europe/Kiev' }))
+          }
+          function kyivDateKey(date) {
+            return toKyiv(date).toISOString().slice(0, 10)
+          }
+          function kyivHour(date) {
+            return toKyiv(date).getHours()
+          }
+
           // ── Читаємо поточну історію ───────────────────────────────────
           let existing = {
             kyiv: [], zhytomyr: [],
@@ -140,11 +151,12 @@ jobs:
             const dowObserved = Array(7).fill(0)
             const datesSeen   = new Set()
             alerts.forEach(function(a) {
-              const dateKey = a.started_at.slice(0, 10)
+              const d       = new Date(a.started_at)
+              const dateKey = kyivDateKey(d)
               if (datesSeen.has(dateKey)) return
               datesSeen.add(dateKey)
-              const d   = new Date(a.started_at)
-              const dow = (d.getDay() + 6) % 7
+              const kyiv = toKyiv(d)
+              const dow  = (kyiv.getDay() + 6) % 7
               dowObserved[dow]++
             })
 
@@ -154,9 +166,10 @@ jobs:
             })
             alerts.forEach(function(a) {
               const d       = new Date(a.started_at)
-              const dow     = (d.getDay() + 6) % 7
-              const hour    = d.getHours()
-              const dateKey = a.started_at.slice(0, 10)
+              const kyiv    = toKyiv(d)
+              const dow     = (kyiv.getDay() + 6) % 7
+              const hour    = kyiv.getHours()
+              const dateKey = kyivDateKey(d)
               slotDates[dow][hour].add(dateKey)
             })
 
@@ -170,10 +183,11 @@ jobs:
 
             const slots = []
             for (let i = 1; i <= 6; i++) {
-              const future = new Date(now.getTime() + i * 3600000)
+              const future     = new Date(now.getTime() + i * 3600000)
               future.setMinutes(0, 0, 0)
-              const dow  = (future.getDay() + 6) % 7
-              const hour = future.getHours()
+              const kyivFuture = toKyiv(future)
+              const dow  = (kyivFuture.getDay() + 6) % 7
+              const hour = kyivFuture.getHours()
               slots.push({
                 dt       : future.toISOString(),
                 prob     : slotProb(dow, hour),
@@ -207,21 +221,22 @@ jobs:
             // Для кожного дня і години — чи була тривога
             const byDayHour = {}
             filtered.forEach(function(a) {
-              // Використовуємо UTC щоб збігатися з форматом прогнозів
+              // Використовуємо київський час
               const start = new Date(a.started_at)
-              const day   = start.toISOString().slice(0, 10)
-              const hour  = start.getUTCHours()
+              const day   = kyivDateKey(start)
+              const hour  = kyivHour(start)
               if (!byDayHour[day]) byDayHour[day] = {}
               byDayHour[day][hour] = 1
 
-              // Якщо тривога тривала кілька годин — позначаємо всі UTC години
+              // Якщо тривога тривала кілька годин — позначаємо всі київські години
               if (a.finished_at) {
                 const end = new Date(a.finished_at)
                 let cur = new Date(start)
-                cur.setUTCMinutes(0, 0, 0)
+                // Округлюємо до початку київської години
+                cur.setMinutes(0, 0, 0)
                 while (cur <= end) {
-                  const d = cur.toISOString().slice(0, 10)
-                  const h = cur.getUTCHours()
+                  const d = kyivDateKey(cur)
+                  const h = kyivHour(cur)
                   if (!byDayHour[d]) byDayHour[d] = {}
                   byDayHour[d][h] = 1
                   cur = new Date(cur.getTime() + 3600000)

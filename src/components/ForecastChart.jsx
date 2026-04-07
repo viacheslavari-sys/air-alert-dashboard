@@ -13,11 +13,17 @@ const RANGE_OPTIONS = [
   { label: 'Весь час', days: 999 },
 ]
 
-// Форматуємо дату для осі X
+// Форматуємо дату для осі X — відображаємо в київському часі
 function fmtDt(isoStr) {
   const d = new Date(isoStr)
-  return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'numeric' }) +
-    ' ' + String(d.getUTCHours()).padStart(2, '0') + ':00'
+  const kyivStr = d.toLocaleString('uk-UA', {
+    timeZone : 'Europe/Kiev',
+    day      : 'numeric',
+    month    : 'numeric',
+    hour     : '2-digit',
+    minute   : '2-digit',
+  })
+  return kyivStr
 }
 
 function ForecastTooltip({ active, payload }) {

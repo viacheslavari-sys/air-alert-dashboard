@@ -252,11 +252,12 @@ export function computeForecast(alerts, hoursAhead) {
   var dowObserved = Array(7).fill(0)
   var datesSeen   = new Set()
   alerts.forEach(function(a) {
-    var dateKey = a.started_at.slice(0, 10)
+    var d       = new Date(a.started_at)
+    var kyivDay = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Kiev' }))
+    var dateKey = kyivDay.toISOString().slice(0, 10)
     if (datesSeen.has(dateKey)) return
     datesSeen.add(dateKey)
-    var d   = new Date(a.started_at)
-    var dow = (d.getDay() + 6) % 7
+    var dow = (kyivDay.getDay() + 6) % 7
     dowObserved[dow]++
   })
 
@@ -296,8 +297,9 @@ export function computeForecast(alerts, hoursAhead) {
   for (var i = 1; i <= hoursAhead; i++) {
     var future = new Date(now.getTime() + i * 3600000)
     future.setMinutes(0, 0, 0)
-    var dow  = (future.getDay() + 6) % 7
-    var hour = future.getHours()
+    var kyivFuture = new Date(future.toLocaleString('en-US', { timeZone: 'Europe/Kiev' }))
+    var dow  = (kyivFuture.getDay() + 6) % 7
+    var hour = kyivFuture.getHours()
 
     var prob = slotProb(dow, hour)
 
