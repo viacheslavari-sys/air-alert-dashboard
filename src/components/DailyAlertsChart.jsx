@@ -8,15 +8,13 @@ const REGIONS = {
   zhytomyr: { name: 'Житомир',  color: '#f97316' },
 }
 
-// Будує злитий масив з двох daily_counts
+var DAY_NAMES = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+
 function buildFromDailyCounts(kyivCounts, zhytomyrCounts) {
-  // Збираємо всі унікальні дати
   var allDates = new Set()
-  if (kyivCounts) Object.keys(kyivCounts).forEach(function(d) { allDates.add(d) })
+  if (kyivCounts)     Object.keys(kyivCounts).forEach(function(d) { allDates.add(d) })
   if (zhytomyrCounts) Object.keys(zhytomyrCounts).forEach(function(d) { allDates.add(d) })
-
   if (allDates.size === 0) return []
-
   return Array.from(allDates).sort().map(function(date) {
     return {
       date    : date,
@@ -27,7 +25,6 @@ function buildFromDailyCounts(kyivCounts, zhytomyrCounts) {
   })
 }
 
-// Fallback з масиву тривог для одного регіону
 function buildFromAlerts(alerts, regionKey) {
   if (!Array.isArray(alerts) || alerts.length === 0) return []
   var byDay = {}
@@ -37,7 +34,6 @@ function buildFromAlerts(alerts, regionKey) {
   })
   var keys = Object.keys(byDay).sort()
   if (keys.length === 0) return []
-
   var start = new Date(keys[0])
   var end   = new Date()
   end.setHours(0, 0, 0, 0)
@@ -45,10 +41,7 @@ function buildFromAlerts(alerts, regionKey) {
   var cur   = new Date(start)
   while (cur <= end) {
     var key = cur.toISOString().slice(0, 10)
-    var row = {
-      date : key,
-      label: new Date(key).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }),
-    }
+    var row = { date: key, label: new Date(key).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }) }
     row[regionKey] = byDay[key] || 0
     rows.push(row)
     cur.setDate(cur.getDate() + 1)
@@ -56,7 +49,30 @@ function buildFromAlerts(alerts, regionKey) {
   return rows
 }
 
-var DAY_NAMES = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+// Рахує метрики порівняння двох регіонів
+function calcComparison(data, kyivTotal, zhytomyrTotal) {
+  if (!data.length || kyivTotal === 0 || zhytomyrTotal === 0) return null
+
+  // Співвідношення інтенсивності
+  var ratio = Math.round(zhytomyrTotal / kyivTotal * 100)
+
+  // Синхронізація — дні коли обидва регіони мали тривоги
+  var bothActive = 0
+  var eitherActive = 0
+  data.forEach(function(d) {
+    var k = d.kyiv || 0
+    var z = d.zhytomyr || 0
+    if (k > 0 || z > 0) eitherActive++
+    if (k > 0 && z > 0) bothActive++
+  })
+  var sync = eitherActive > 0 ? Math.round(bothActive / eitherActive * 100) : 0
+
+  // Дні тільки в одному регіоні
+  var onlyKyiv     = data.filter(function(d) { return (d.kyiv||0) > 0 && (d.zhytomyr||0) === 0 }).length
+  var onlyZhytomyr = data.filter(function(d) { return (d.zhytomyr||0) > 0 && (d.kyiv||0) === 0 }).length
+
+  return { ratio: ratio, sync: sync, bothActive: bothActive, eitherActive: eitherActive, onlyKyiv: onlyKyiv, onlyZhytomyr: onlyZhytomyr }
+}
 
 function DailyTooltip({ active, payload }) {
   if (!active || !payload || !payload.length) return null
@@ -78,6 +94,38 @@ function DailyTooltip({ active, payload }) {
   )
 }
 
+function ComparisonBlock({ cmp, kyivTotal, zhytomyrTotal }) {
+  if (!cmp) return null
+  return (
+    <div className="daily-comparison">
+      <div className="dc-item">
+        <span className="dc-value">{cmp.ratio}%</span>
+        <span className="dc-label">
+          інтенсивність Житомира відносно Вишгорода
+        </span>
+      </div>
+      <div className="dc-divider" />
+      <div className="dc-item">
+        <span className="dc-value">{cmp.sync}%</span>
+        <span className="dc-label">
+          синхронізація · {cmp.bothActive} з {cmp.eitherActive} активних днів збіглись
+        </span>
+      </div>
+      <div className="dc-divider" />
+      <div className="dc-item dc-item--split">
+        <span>
+          <span className="dc-dot" style={{ background: REGIONS.kyiv.color }} />
+          <span className="dc-small">{cmp.onlyKyiv} дн тільки Вишгород</span>
+        </span>
+        <span>
+          <span className="dc-dot" style={{ background: REGIONS.zhytomyr.color }} />
+          <span className="dc-small">{cmp.onlyZhytomyr} дн тільки Житомир</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function DailyAlertsChart({ alertsMap, dailyCounts }) {
   var kyivCounts     = dailyCounts && dailyCounts.kyiv
   var zhytomyrCounts = dailyCounts && dailyCounts.zhytomyr
@@ -86,19 +134,18 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
   if (kyivCounts || zhytomyrCounts) {
     data = buildFromDailyCounts(kyivCounts, zhytomyrCounts)
   } else {
-    // Fallback
     var kyivAlerts = alertsMap && alertsMap.kyiv ? alertsMap.kyiv : []
     data = buildFromAlerts(kyivAlerts, 'kyiv')
   }
 
-  var days  = data.length
+  var days          = data.length
   var kyivTotal     = data.reduce(function(s, d) { return s + (d.kyiv || 0) }, 0)
   var zhytomyrTotal = data.reduce(function(s, d) { return s + (d.zhytomyr || 0) }, 0)
+  var cmp           = calcComparison(data, kyivTotal, zhytomyrTotal)
 
-  var tickInterval = days <= 30 ? 6 : days <= 60 ? 9 : days <= 90 ? 14 : 20
-
-  var showKyiv     = kyivCounts != null || (alertsMap && alertsMap.kyiv)
-  var showZhytomyr = zhytomyrCounts != null
+  var tickInterval  = days <= 30 ? 6 : days <= 60 ? 9 : days <= 90 ? 14 : 20
+  var showKyiv      = kyivCounts != null || (alertsMap && alertsMap.kyiv)
+  var showZhytomyr  = zhytomyrCounts != null
 
   return (
     <div className="chart-card">
@@ -143,47 +190,24 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fill: '#8899aa', fontSize: 10 }}
-              tickLine={false}
-              axisLine={false}
-              interval={tickInterval}
-            />
-            <YAxis
-              tick={{ fill: '#8899aa', fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              allowDecimals={false}
-            />
+            <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 10 }} tickLine={false} axisLine={false} interval={tickInterval} />
+            <YAxis tick={{ fill: '#8899aa', fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
             <Tooltip content={<DailyTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
             {showKyiv && (
-              <Area
-                type="monotone"
-                dataKey="kyiv"
-                name={REGIONS.kyiv.name}
-                stroke={REGIONS.kyiv.color}
-                strokeWidth={2}
-                fill="url(#gradKyiv)"
-                dot={false}
-                activeDot={{ r: 4, fill: REGIONS.kyiv.color, strokeWidth: 0 }}
-              />
+              <Area type="monotone" dataKey="kyiv" name={REGIONS.kyiv.name}
+                stroke={REGIONS.kyiv.color} strokeWidth={2} fill="url(#gradKyiv)"
+                dot={false} activeDot={{ r: 4, fill: REGIONS.kyiv.color, strokeWidth: 0 }} />
             )}
             {showZhytomyr && (
-              <Area
-                type="monotone"
-                dataKey="zhytomyr"
-                name={REGIONS.zhytomyr.name}
-                stroke={REGIONS.zhytomyr.color}
-                strokeWidth={2}
-                fill="url(#gradZhytomyr)"
-                dot={false}
-                activeDot={{ r: 4, fill: REGIONS.zhytomyr.color, strokeWidth: 0 }}
-              />
+              <Area type="monotone" dataKey="zhytomyr" name={REGIONS.zhytomyr.name}
+                stroke={REGIONS.zhytomyr.color} strokeWidth={2} fill="url(#gradZhytomyr)"
+                dot={false} activeDot={{ r: 4, fill: REGIONS.zhytomyr.color, strokeWidth: 0 }} />
             )}
           </AreaChart>
         </ResponsiveContainer>
       )}
+
+      {cmp && <ComparisonBlock cmp={cmp} kyivTotal={kyivTotal} zhytomyrTotal={zhytomyrTotal} />}
     </div>
   )
 }
