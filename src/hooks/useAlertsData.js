@@ -8,10 +8,10 @@ import {
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
-const HISTORY_URL = 'https://raw.githubusercontent.com/' +
+const HISTORY_URL = 'https://cdn.jsdelivr.net/gh/' +
   (import.meta.env.VITE_GITHUB_USER || 'YOUR_GITHUB_USER') + '/' +
   (import.meta.env.VITE_REPO_NAME   || 'YOUR_REPO_NAME')  +
-  '/main/data/history.json'
+  '@main/data/history.json'
 
 // Які location_title вважати релевантними для кожного регіону
 const REGION_FILTERS = {
@@ -57,7 +57,7 @@ async function fetchRegion(region) {
 async function fetchAccumulated() {
   try {
     // Додаємо timestamp щоб обходити CDN кеш GitHub
-    var url = HISTORY_URL + '?t=' + Math.floor(Date.now() / 60000) // оновлюється щохвилини
+    var url = HISTORY_URL + '?v=' + Math.floor(Date.now() / 300000) // jsDelivr, оновлення ~5 хв
     var res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) return null
     return res.json()
