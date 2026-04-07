@@ -56,12 +56,15 @@ function buildFromAlerts(alerts, regionKey) {
   return rows
 }
 
+var DAY_NAMES = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+
 function DailyTooltip({ active, payload }) {
   if (!active || !payload || !payload.length) return null
   var row = payload[0] && payload[0].payload ? payload[0].payload : {}
+  var dayName = row.date ? DAY_NAMES[new Date(row.date).getDay()] : ''
   return (
     <div className="tooltip-box">
-      <div className="tooltip-hour">{row.label}</div>
+      <div className="tooltip-hour">{dayName + ', ' + row.label}</div>
       {payload.map(function(p) {
         if (p.value == null) return null
         return (
