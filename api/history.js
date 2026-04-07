@@ -1,0 +1,39 @@
+/**
+ * Проксі для читання history.json з GitHub репо
+ * GET /api/history
+ * Обходить CDN кеш через GitHub API
+ */
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+
+  var user = process.env.VITE_GITHUB_USER
+  var repo = process.env.VITE_REPO_NAME
+
+  if (!user || !repo) {
+    return res.status(500).json({ error: 'VITE_GITHUB_USER або VITE_REPO_NAME не налаштовані' })
+  }
+
+  try {
+    // GitHub API завжди повертає актуальну версію без кешу
+    var apiUrl = 'https://api.github.com/repos/' + user + '/' + repo + '/contents/data/history.json'
+    var response = await fetch(apiUrl, {
+      headers: {
+        'Accept'    : 'application/vnd.github.raw',
+        'User-Agent': 'air-alert-dashboard',
+      },
+    })
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'GitHub API: ' + response.status })
+    }
+
+    var data = await response.json()
+
+    // Не кешуємо на Vercel — дані мають бути свіжими
+    res.setHeader('Cache-Control', 'no-store')
+    return res.status(200).json(data)
+
+  } catch (err) {
+    return res.status(502).json({ error: String(err) })
+  }
+}
