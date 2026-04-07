@@ -1433,3 +1433,12 @@ body {
   .dc-divider { display: none; }
   .dc-item { padding: 8px 0; border-top: 1px solid var(--border); }
 }
+
+/* ── DailyAlertsChart controls ── */
+.daily-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}

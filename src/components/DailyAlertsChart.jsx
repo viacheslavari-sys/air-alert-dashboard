@@ -1,7 +1,15 @@
+import { useState } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts'
+
+const RANGE_OPTIONS = [
+  { label: '7 дн',    days: 7   },
+  { label: '30 дн',   days: 30  },
+  { label: '90 дн',   days: 90  },
+  { label: 'Весь час', days: 9999 },
+]
 
 const REGIONS = {
   kyiv    : { name: 'Вишгород', color: '#3b82f6' },
@@ -138,10 +146,18 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
     data = buildFromAlerts(kyivAlerts, 'kyiv')
   }
 
-  var days          = data.length
-  var kyivTotal     = data.reduce(function(s, d) { return s + (d.kyiv || 0) }, 0)
-  var zhytomyrTotal = data.reduce(function(s, d) { return s + (d.zhytomyr || 0) }, 0)
-  var cmp           = calcComparison(data, kyivTotal, zhytomyrTotal)
+  // Фільтр діапазону
+  var _range   = useState(3)  // дефолт — весь час
+  var rangeIdx = _range[0]
+  var setRange = _range[1]
+
+  var rangeDays = RANGE_OPTIONS[rangeIdx].days
+  var filteredData = rangeDays >= 9999 ? data : data.slice(-rangeDays)
+
+  var days          = filteredData.length
+  var kyivTotal     = filteredData.reduce(function(s, d) { return s + (d.kyiv || 0) }, 0)
+  var zhytomyrTotal = filteredData.reduce(function(s, d) { return s + (d.zhytomyr || 0) }, 0)
+  var cmp           = calcComparison(filteredData, kyivTotal, zhytomyrTotal)
 
   var tickInterval  = days <= 30 ? 6 : days <= 60 ? 9 : days <= 90 ? 14 : 20
   var showKyiv      = kyivCounts != null || (alertsMap && alertsMap.kyiv)
@@ -158,7 +174,21 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
               : 'Немає даних'}
           </p>
         </div>
-        <div className="chart-legend-row">
+        <div className="daily-controls">
+          <div className="fc-range">
+            {RANGE_OPTIONS.map(function(opt, i) {
+              return (
+                <button
+                  key={opt.label}
+                  className={'fc-range-btn ' + (rangeIdx === i ? 'fc-range-btn--active' : '')}
+                  onClick={function() { setRange(i) }}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+          <div className="chart-legend-row">
           {showKyiv && (
             <span className="legend-item">
               <span className="legend-dot" style={{ background: REGIONS.kyiv.color }} />
@@ -171,6 +201,7 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
               <span className="legend-text">{REGIONS.zhytomyr.name} · {zhytomyrTotal}</span>
             </span>
           )}
+          </div>
         </div>
       </div>
 
@@ -178,7 +209,7 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
         <div className="fc-empty">Немає даних для відображення.</div>
       ) : (
         <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+          <AreaChart data={filteredData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
             <defs>
               <linearGradient id="gradKyiv" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%"  stopColor={REGIONS.kyiv.color} stopOpacity={0.35} />
