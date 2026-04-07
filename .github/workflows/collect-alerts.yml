@@ -207,26 +207,13 @@ jobs:
             // Для кожного дня і години — чи була тривога
             const byDayHour = {}
             filtered.forEach(function(a) {
-              // alerts.in.ua вже повертає київський час
+              // Позначаємо тільки годину ПОЧАТКУ тривоги
+              // (не тривалість) — одна тривога = один слот
               const start = new Date(a.started_at)
               const day   = a.started_at.slice(0, 10)
               const hour  = start.getHours()
               if (!byDayHour[day]) byDayHour[day] = {}
               byDayHour[day][hour] = 1
-
-              // Якщо тривога тривала кілька годин — позначаємо всі години
-              if (a.finished_at) {
-                const end = new Date(a.finished_at)
-                let cur = new Date(start)
-                cur.setMinutes(0, 0, 0)
-                while (cur <= end) {
-                  const d = cur.toISOString().slice(0, 10)
-                  const h = cur.getHours()
-                  if (!byDayHour[d]) byDayHour[d] = {}
-                  byDayHour[d][h] = 1
-                  cur = new Date(cur.getTime() + 3600000)
-                }
-              }
             })
 
             // Заповнюємо від початку збору до сьогодні
