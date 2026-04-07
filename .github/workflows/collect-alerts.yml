@@ -185,8 +185,10 @@ jobs:
           }
 
           // Фільтруємо по районах — як і на фронтенді
-          var kyivFiltered     = kyivAll.filter(function(a) { return KYIV_FILTER.indexOf(a.location_title) !== -1 })
-          var zhytomyrFiltered = zhytomyrAll.filter(function(a) { return ZHYTOMYR_FILTER.indexOf(a.location_title) !== -1 })
+          const KYIV_F     = ['Вишгородський район', 'Київська область']
+          const ZHYTOMYR_F = ['Житомирський район',  'Житомирська область']
+          var kyivFiltered     = kyivAll.filter(function(a) { return KYIV_F.indexOf(a.location_title) !== -1 })
+          var zhytomyrFiltered = zhytomyrAll.filter(function(a) { return ZHYTOMYR_F.indexOf(a.location_title) !== -1 })
           var kyivForecast     = makeForecast(kyivFiltered)
           var zhytomyrForecast = makeForecast(zhytomyrFiltered)
           if (kyivForecast)     existing.forecasts.kyiv.push(kyivForecast)
