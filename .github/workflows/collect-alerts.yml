@@ -184,8 +184,11 @@ jobs:
             return { made_at: now.toISOString(), slots: slots }
           }
 
-          var kyivForecast     = makeForecast(kyivAll)
-          var zhytomyrForecast = makeForecast(zhytomyrAll)
+          // Фільтруємо по районах — як і на фронтенді
+          var kyivFiltered     = kyivAll.filter(function(a) { return KYIV_FILTER.indexOf(a.location_title) !== -1 })
+          var zhytomyrFiltered = zhytomyrAll.filter(function(a) { return ZHYTOMYR_FILTER.indexOf(a.location_title) !== -1 })
+          var kyivForecast     = makeForecast(kyivFiltered)
+          var zhytomyrForecast = makeForecast(zhytomyrFiltered)
           if (kyivForecast)     existing.forecasts.kyiv.push(kyivForecast)
           if (zhytomyrForecast) existing.forecasts.zhytomyr.push(zhytomyrForecast)
 
