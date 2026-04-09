@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAlertsData } from './hooks/useAlertsData'
 import { RegionFilter } from './components/RegionFilter'
 import { StatsCards } from './components/StatsCards'
@@ -7,6 +7,23 @@ import { ForecastChart } from './components/ForecastChart'
 import { DailyAlertsChart } from './components/DailyAlertsChart'
 
 export default function App() {
+  // Статус активної тривоги — оновлюється кожні 30 секунд
+  var _alertStatus = useState(null)  // null | true | false
+  var alertStatus  = _alertStatus[0]
+  var setAlertStatus = _alertStatus[1]
+
+  useEffect(function() {
+    function fetchStatus() {
+      fetch('/api/alert-status')
+        .then(function(r) { return r.json() })
+        .then(function(d) { setAlertStatus(d.alert === true) })
+        .catch(function() { setAlertStatus(null) })
+    }
+    fetchStatus()
+    var interval = setInterval(fetchStatus, 30000)
+    return function() { clearInterval(interval) }
+  }, [])
+
   var _data     = useAlertsData()
   var loading   = _data.loading
   var error     = _data.error
@@ -39,9 +56,11 @@ export default function App() {
 
       <header className="header">
         <div className="header-left">
-          <div className="header-badge">
+          <div className={'header-badge' + (alertStatus === true ? ' header-badge--alert' : alertStatus === false ? ' header-badge--calm' : '')}>
             <span className="badge-dot" />
-            <span className="badge-text">{isMock ? 'ДЕМО-ДАНІ' : 'LIVE'}</span>
+            <span className="badge-text">
+              {isMock ? 'ДЕМО-ДАНІ' : alertStatus === true ? 'ТРИВОГА' : alertStatus === false ? 'СПОКІЙ' : 'LIVE'}
+            </span>
           </div>
           <div>
             <h1 className="header-title">
