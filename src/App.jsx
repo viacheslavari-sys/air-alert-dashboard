@@ -67,7 +67,7 @@ export default function App() {
               <span className="title-icon">⚠</span>
               Аналітика тривог
             </h1>
-            <p className="header-sub">{regionLabel} · {historyDays} днів</p>
+            <p className="header-sub">{regionLabel} · {loading ? '...' : historyDays + ' днів'}</p>
           </div>
         </div>
         <div className="header-right">
@@ -111,10 +111,12 @@ export default function App() {
 
         {!loading && current && (
           <>
-            <StatsCards
-              statsMap={statsMap}
-              regionKeys={[selectedRegion]}
-            />
+            {!loading && (
+              <StatsCards
+                statsMap={statsMap}
+                regionKeys={[selectedRegion]}
+              />
+            )}
             <HeatmapWithFinder
               alerts={current.alerts}
               regionKey={selectedRegion}
