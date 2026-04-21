@@ -186,8 +186,9 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
 
   // Поточний прогноз на 6 годин
   var forecast  = computeForecast(alerts, 6)
+  // Для майбутнього показуємо всі слоти >= 20% — щоб завжди була зона справа
   var futureData = forecast.slots
-    .filter(function(s) { return s.adjustedProbability >= 0.5 })
+    .filter(function(s) { return s.adjustedProbability >= 0.2 })
     .map(function(s) {
       return {
         dt       : s.label,
