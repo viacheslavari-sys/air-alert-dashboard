@@ -139,14 +139,20 @@ jobs:
             // Підраховуємо скільки разів кожен dow зустрівся у вибірці
             const dowObserved = Array(7).fill(0)
             const datesSeen   = new Set()
-            alerts.forEach(function(a) {
-              const dateKey = a.started_at.slice(0, 10)
-              if (datesSeen.has(dateKey)) return
-              datesSeen.add(dateKey)
-              const d   = new Date(a.started_at)
-              const dow = (d.getDay() + 6) % 7
-              dowObserved[dow]++
-            })
+            // Рахуємо ВСІ дні від першої тривоги до сьогодні
+            if (alerts.length > 0) {
+              const sortedDates = alerts.map(function(a) { return a.started_at.slice(0,10) }).sort()
+              const firstDate = new Date(sortedDates[0])
+              const lastDate  = new Date()
+              firstDate.setHours(0,0,0,0)
+              lastDate.setHours(0,0,0,0)
+              const cur = new Date(firstDate)
+              while (cur <= lastDate) {
+                const dow = (cur.getDay() + 6) % 7
+                dowObserved[dow]++
+                cur.setDate(cur.getDate() + 1)
+              }
+            }
 
             // Унікальні дати з тривогою для кожного слоту [dow][hour]
             const slotDates = Array.from({ length: 7 }, function() {

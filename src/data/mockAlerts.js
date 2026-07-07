@@ -249,16 +249,21 @@ export function computeForecast(alerts, hoursAhead) {
   //                         / загальна кількість таких днів тижня у вибірці
 
   // Підраховуємо скільки разів кожен день тижня зустрівся у вибірці
+  // Рахуємо ВСІ дні від першої до останньої тривоги, включно з тихими
   var dowObserved = Array(7).fill(0)
-  var datesSeen   = new Set()
-  alerts.forEach(function(a) {
-    var dateKey = a.started_at.slice(0, 10)
-    if (datesSeen.has(dateKey)) return
-    datesSeen.add(dateKey)
-    var d   = new Date(a.started_at)
-    var dow = (d.getDay() + 6) % 7
-    dowObserved[dow]++
-  })
+  if (alerts.length > 0) {
+    var sortedDates = alerts.map(function(a) { return a.started_at.slice(0,10) }).sort()
+    var firstDate = new Date(sortedDates[0])
+    var lastDate  = new Date()
+    firstDate.setHours(0,0,0,0)
+    lastDate.setHours(0,0,0,0)
+    var cur = new Date(firstDate)
+    while (cur <= lastDate) {
+      var dow = (cur.getDay() + 6) % 7
+      dowObserved[dow]++
+      cur.setDate(cur.getDate() + 1)
+    }
+  }
 
   // Підраховуємо унікальні дати з тривогою для кожного слоту [dow][hour]
   var slotDates = Array.from({ length: 7 }, function() {
