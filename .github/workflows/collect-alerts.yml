@@ -97,8 +97,8 @@ jobs:
 
           // ── Заповнюємо had_alert для вчорашніх прогнозів ─────────────
           function fillActuals(forecasts, alerts) {
-            const KYIV_FILTER     = ['Вишгородський район', 'Київська область']
-            const ZHYTOMYR_FILTER = ['Житомирський район',  'Житомирська область']
+            const KYIV_FILTER     = ['Вишгородський район']
+            const ZHYTOMYR_FILTER = ['Житомирський район']
 
             // Будуємо set годин коли була тривога (UTC, округлено до години)
             const alertHours = new Set()
@@ -191,8 +191,8 @@ jobs:
           }
 
           // Фільтруємо по районах — як і на фронтенді
-          const KYIV_F     = ['Вишгородський район', 'Київська область']
-          const ZHYTOMYR_F = ['Житомирський район',  'Житомирська область']
+          const KYIV_F     = ['Вишгородський район']
+          const ZHYTOMYR_F = ['Житомирський район']
           var kyivFiltered     = kyivAll.filter(function(a) { return KYIV_F.indexOf(a.location_title) !== -1 })
           var zhytomyrFiltered = zhytomyrAll.filter(function(a) { return ZHYTOMYR_F.indexOf(a.location_title) !== -1 })
           var kyivForecast     = makeForecast(kyivFiltered)
@@ -247,8 +247,8 @@ jobs:
           }
 
           // ── Будуємо daily_counts ─────────────────────────────────────
-          const KYIV_FILTER     = ['Вишгородський район', 'Київська область']
-          const ZHYTOMYR_FILTER = ['Житомирський район',  'Житомирська область']
+          const KYIV_FILTER     = ['Вишгородський район']
+          const ZHYTOMYR_FILTER = ['Житомирський район']
 
           function buildDailyCounts(alerts, filter) {
             const filtered = alerts.filter(function(a) {
