@@ -1,4 +1,4 @@
-// updated: 2026-07-07- once more once more
+// updated: 2026-07-07
 import { useState } from 'react'
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -187,9 +187,8 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
 
   // Поточний прогноз на 6 годин
   var forecast  = computeForecast(alerts, 6)
-  // Для майбутнього показуємо всі слоти >= 20% — щоб завжди була зона справа
+  // Показуємо всі майбутні слоти — завжди є зона справа від "Зараз"
   var futureData = forecast.slots
-    .filter(function(s) { return s.adjustedProbability >= 0.2 })
     .map(function(s) {
       return {
         dt       : s.label,
@@ -278,7 +277,7 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
         </div>
       )}
 
-      {chartData.length <= 1 ? (
+      {chartData.length === 0 ? (
         <div className="fc-empty">Немає даних для відображення.</div>
       ) : (
         <ResponsiveContainer width="100%" height={260}>
