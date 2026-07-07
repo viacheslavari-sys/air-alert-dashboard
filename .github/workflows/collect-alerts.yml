@@ -92,8 +92,13 @@ jobs:
             })
           }
 
+          const MERGE_KYIV_FILTER     = ['Вишгородський район']
+          const MERGE_ZHYTOMYR_FILTER = ['Житомирський район']
+
           const kyivAll     = merge(existing.kyiv,     kyivFresh)
+            .filter(function(a) { return MERGE_KYIV_FILTER.indexOf(a.location_title) !== -1 })
           const zhytomyrAll = merge(existing.zhytomyr, zhytomyrFresh)
+            .filter(function(a) { return MERGE_ZHYTOMYR_FILTER.indexOf(a.location_title) !== -1 })
 
           // ── Заповнюємо had_alert для вчорашніх прогнозів ─────────────
           function fillActuals(forecasts, alerts) {
