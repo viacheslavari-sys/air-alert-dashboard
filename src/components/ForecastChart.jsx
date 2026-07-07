@@ -152,8 +152,8 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
   // Будуємо історію
   var historyData = buildHistoryData(savedForecasts, RANGE_OPTIONS[rangeIdx].days)
 
-  // Фільтруємо для відображення: тільки >= 50% або з оціненим результатом
-  var displayHistory = historyData.filter(function(r) { return r.prob >= 0.5 })
+  // Фільтруємо для відображення: тільки >= 20%
+  var displayHistory = historyData.filter(function(r) { return r.prob >= 0.2 })
 
   // Знаходимо пропущені тривоги
   var predictedKeys = {}

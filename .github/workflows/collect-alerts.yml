@@ -200,11 +200,11 @@ jobs:
           if (kyivForecast)     existing.forecasts.kyiv.push(kyivForecast)
           if (zhytomyrForecast) existing.forecasts.zhytomyr.push(zhytomyrForecast)
 
-          // Тримаємо останні 90 прогнозів (90 днів)
+          // Тримаємо останні 2000 прогнозів
           if (existing.forecasts.kyiv.length > 90)
-            existing.forecasts.kyiv = existing.forecasts.kyiv.slice(-90)
+            existing.forecasts.kyiv = existing.forecasts.kyiv.slice(-2000)
           if (existing.forecasts.zhytomyr.length > 90)
-            existing.forecasts.zhytomyr = existing.forecasts.zhytomyr.slice(-90)
+            existing.forecasts.zhytomyr = existing.forecasts.zhytomyr.slice(-2000)
 
           // ── Будуємо hourly_actuals ───────────────────────────────────
           // Для кожного дня і кожної години: 1 якщо була тривога, 0 якщо ні
