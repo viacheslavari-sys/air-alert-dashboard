@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts'
 
@@ -102,10 +102,80 @@ function DailyTooltip({ active, payload }) {
   )
 }
 
-function ComparisonBlock({ cmp, kyivTotal, zhytomyrTotal }) {
+// Лінійна регресія — повертає нахил і функцію y(x)
+function calcTrend(data, key) {
+  var vals = data.map(function(d) { return d[key] || 0 })
+  var n = vals.length
+  if (n < 3) return null
+  var sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+  vals.forEach(function(y, x) {
+    sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x
+  })
+  var denom = n * sumX2 - sumX * sumX
+  if (denom === 0) return null
+  var slope     = (n * sumXY - sumX * sumY) / denom
+  var intercept = (sumY - slope * sumX) / n
+  return {
+    slope       : slope,
+    perMonth    : slope * 30,
+    valueAt     : function(x) { return Math.max(0, slope * x + intercept) },
+    direction   : slope > 0.01 ? 'up' : slope < -0.01 ? 'down' : 'flat',
+  }
+}
+
+// Ковзне середнє (вікно w днів)
+function movingAverage(data, key, w) {
+  return data.map(function(d, i) {
+    var start = Math.max(0, i - Math.floor(w / 2))
+    var end   = Math.min(data.length - 1, i + Math.floor(w / 2))
+    var sum = 0, count = 0
+    for (var j = start; j <= end; j++) {
+      sum += data[j][key] || 0
+      count++
+    }
+    return count > 0 ? sum / count : 0
+  })
+}
+
+// Додає поля тренду і ковзного середнього в дані
+function enrichWithTrend(data) {
+  var trendK = calcTrend(data, 'kyiv')
+  var maK    = movingAverage(data, 'kyiv', 7)
+  return {
+    data: data.map(function(d, i) {
+      return Object.assign({}, d, {
+        kyivTrend: trendK ? trendK.valueAt(i) : null,
+        kyivMA   : maK[i],
+      })
+    }),
+    trendKyiv: trendK,
+  }
+}
+
+function TrendBadge({ trend, avg }) {
+  if (!trend) return null
+  var arrow = trend.direction === 'up' ? '↗' : trend.direction === 'down' ? '↘' : '→'
+  var color = trend.direction === 'up' ? '#ef4444' : trend.direction === 'down' ? '#4ade80' : '#8899aa'
+  var text  = trend.direction === 'up' ? 'зростає' : trend.direction === 'down' ? 'спадає' : 'стабільна'
+  var change = Math.abs(trend.perMonth).toFixed(1)
+  return (
+    <div className="dc-item">
+      <span className="dc-value" style={{ color: color }}>
+        {arrow} {text}
+      </span>
+      <span className="dc-label">
+        {trend.direction === 'flat'
+          ? 'середня ' + avg.toFixed(1) + ' тривог/день'
+          : (trend.direction === 'up' ? '+' : '−') + change + ' тривог/день за місяць'}
+      </span>
+    </div>
+  )
+}
+
+function ComparisonBlock({ cmp }) {
   if (!cmp) return null
   return (
-    <div className="daily-comparison">
+    <>
       <div className="dc-item">
         <span className="dc-value">{cmp.ratio}%</span>
         <span className="dc-label">
@@ -130,7 +200,7 @@ function ComparisonBlock({ cmp, kyivTotal, zhytomyrTotal }) {
           <span className="dc-small">{cmp.onlyZhytomyr} дн тільки Житомир</span>
         </span>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -158,6 +228,10 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
   var kyivTotal     = filteredData.reduce(function(s, d) { return s + (d.kyiv || 0) }, 0)
   var zhytomyrTotal = filteredData.reduce(function(s, d) { return s + (d.zhytomyr || 0) }, 0)
   var cmp           = calcComparison(filteredData, kyivTotal, zhytomyrTotal)
+  var enriched      = enrichWithTrend(filteredData)
+  var chartRows     = enriched.data
+  var trendKyiv     = enriched.trendKyiv
+  var avgKyiv       = filteredData.length > 0 ? kyivTotal / filteredData.length : 0
 
   var tickInterval  = days <= 30 ? 6 : days <= 60 ? 9 : days <= 90 ? 14 : 20
   var showKyiv      = kyivCounts != null || (alertsMap && alertsMap.kyiv)
@@ -201,6 +275,14 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
               <span className="legend-text">{REGIONS.zhytomyr.name} · {zhytomyrTotal}</span>
             </span>
           )}
+          <span className="legend-item">
+            <span className="legend-line" style={{ background: '#93c5fd' }} />
+            <span className="legend-text">Ковзне 7дн</span>
+          </span>
+          <span className="legend-item">
+            <span className="legend-line legend-line--dashed" style={{ background: '#ef4444' }} />
+            <span className="legend-text">Тренд</span>
+          </span>
           </div>
         </div>
       </div>
@@ -209,7 +291,7 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
         <div className="fc-empty">Немає даних для відображення.</div>
       ) : (
         <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={filteredData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+          <ComposedChart data={chartRows} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
             <defs>
               <linearGradient id="gradKyiv" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%"  stopColor={REGIONS.kyiv.color} stopOpacity={0.35} />
@@ -234,11 +316,29 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
                 stroke={REGIONS.zhytomyr.color} strokeWidth={2} fill="url(#gradZhytomyr)"
                 dot={false} activeDot={{ r: 4, fill: REGIONS.zhytomyr.color, strokeWidth: 0 }} />
             )}
-          </AreaChart>
+            {/* Ковзне середнє (7 днів) */}
+            {showKyiv && (
+              <Line type="monotone" dataKey="kyivMA" name="Ковзне середнє"
+                stroke="#93c5fd" strokeWidth={1.5} dot={false} activeDot={false}
+                strokeDasharray="0" isAnimationActive={false} />
+            )}
+            {/* Лінія тренду */}
+            {showKyiv && trendKyiv && (
+              <Line type="linear" dataKey="kyivTrend" name="Тренд"
+                stroke="#ef4444" strokeWidth={1.5} dot={false} activeDot={false}
+                strokeDasharray="6 4" isAnimationActive={false} />
+            )}
+          </ComposedChart>
         </ResponsiveContainer>
       )}
 
-      {cmp && <ComparisonBlock cmp={cmp} kyivTotal={kyivTotal} zhytomyrTotal={zhytomyrTotal} />}
+      {cmp && (
+        <div className="daily-comparison">
+          <TrendBadge trend={trendKyiv} avg={avgKyiv} />
+          <div className="dc-divider" />
+          <ComparisonBlock cmp={cmp} />
+        </div>
+      )}
     </div>
   )
 }
