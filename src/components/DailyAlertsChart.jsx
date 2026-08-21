@@ -277,7 +277,7 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
           )}
           <span className="legend-item">
             <span className="legend-line" style={{ background: '#93c5fd' }} />
-            <span className="legend-text">Ковзне 7дн</span>
+            <span className="legend-text">Середнє 7дн</span>
           </span>
           <span className="legend-item">
             <span className="legend-line legend-line--dashed" style={{ background: '#ef4444' }} />
@@ -318,7 +318,7 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
             )}
             {/* Ковзне середнє (7 днів) */}
             {showKyiv && (
-              <Line type="monotone" dataKey="kyivMA" name="Ковзне середнє"
+              <Line type="monotone" dataKey="kyivMA" name="Середнє 7дн"
                 stroke="#93c5fd" strokeWidth={1.5} dot={false} activeDot={false}
                 strokeDasharray="0" isAnimationActive={false} />
             )}
