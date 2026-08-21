@@ -107,11 +107,11 @@ function calcCalibration(forecasts, baseProb) {
     high     : { label: 'Високий',    color: '#ef4444', total: 0, hits: 0 },
   }
 
+  // Використовуємо ЄДИНУ базову ймовірність для консистентності зі шкалою
   forecasts.forEach(function(forecast) {
-    var bp = forecast.base_prob || baseProb || 0.12
     forecast.slots.forEach(function(slot) {
       if (slot.had_alert === null) return
-      var ratio = slot.prob / Math.max(bp, 0.01)
+      var ratio = slot.prob / Math.max(baseProb, 0.01)
       var key = ratio < 0.7 ? 'low' : ratio < 1.3 ? 'normal' : ratio < 1.8 ? 'elevated' : 'high'
       levels[key].total++
       if (slot.had_alert === true) levels[key].hits++
@@ -347,10 +347,12 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
                 var p   = entry.prob || 0
                 var hit = entry.had_alert === 1
                 if (entry.isFuture) return <Cell key={i} fill="#60a5fa" fillOpacity={0.7} stroke="#93c5fd" strokeWidth={1} />
+                // Колір за рівнем загрози відносно базової
+                var t = threatLevel(p)
                 return (
                   <Cell
                     key={i}
-                    fill={hit ? '#4ade80' : p >= 0.7 ? '#ef4444' : '#f97316'}
+                    fill={hit ? '#4ade80' : t.color}
                     stroke={hit ? '#86efac' : 'none'}
                     strokeWidth={hit ? 1.5 : 0}
                     fillOpacity={hit ? 1 : 0.8}
