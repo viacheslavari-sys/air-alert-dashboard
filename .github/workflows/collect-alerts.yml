@@ -192,7 +192,15 @@ jobs:
               })
             }
 
-            return { made_at: now.toISOString(), slots: slots }
+            // Базова імовірність в момент прогнозу
+            const totalHours = alerts.length > 0
+              ? Math.max(1, Math.round((now.getTime() - new Date(alerts.slice().sort(function(a,b){
+                  return new Date(a.started_at)-new Date(b.started_at)
+                })[0].started_at).getTime()) / 3600000))
+              : 1
+            const baseProb = Math.round((alerts.length / totalHours) * 1000) / 1000
+
+            return { made_at: now.toISOString(), base_prob: baseProb, slots: slots }
           }
 
           // Фільтруємо по районах — як і на фронтенді

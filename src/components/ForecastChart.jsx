@@ -96,47 +96,37 @@ function buildHistoryData(forecasts, daysLimit) {
   return Object.values(byDt).sort(function(a, b) { return new Date(a.dt) - new Date(b.dt) })
 }
 
-function calcAccuracy(rows, hourlyActuals) {
-  var filtered = rows.filter(function(r) { return r.prob >= 0.5 && !r.isFuture })
-  var known    = filtered.filter(function(r) { return r.had_alert !== null })
-  if (known.length === 0) return null
+// Калібрування шкали загрози
+function calcCalibration(forecasts, baseProb) {
+  if (!Array.isArray(forecasts) || forecasts.length === 0) return null
 
-  var truePos   = known.filter(function(r) { return r.had_alert === 1 }).length
-  var falsePos  = known.filter(function(r) { return r.had_alert === 0 }).length
-  var precision = Math.round(truePos / known.length * 100)
-
-  var recall = null
-  var falseNeg = null
-  if (hourlyActuals) {
-    var predictedSet = {}
-    filtered.forEach(function(r) {
-      if (r.dt) predictedSet[r.dt.slice(0, 13)] = true
-    })
-    var firstDt = null
-    filtered.forEach(function(r) {
-      if (!r.dt) return
-      if (!firstDt || r.dt < firstDt) firstDt = r.dt
-    })
-    var evaluatedDates = {}
-    filtered.forEach(function(r) {
-      if (r.dt && r.had_alert !== null) evaluatedDates[r.dt.slice(0, 10)] = true
-    })
-    var totalReal = 0
-    var missed    = 0
-    Object.keys(hourlyActuals).forEach(function(day) {
-      if (!evaluatedDates[day]) return
-      hourlyActuals[day].forEach(function(v, h) {
-        if (v !== 1) return
-        var slotDt = day + 'T' + String(h).padStart(2, '0') + ':00:00.000Z'
-        if (firstDt && slotDt < firstDt) return
-        totalReal++
-        if (!predictedSet[day + 'T' + String(h).padStart(2, '0')]) missed++
-      })
-    })
-    falseNeg = missed
-    recall   = totalReal > 0 ? Math.round((totalReal - missed) / totalReal * 100) : null
+  var levels = {
+    low      : { label: 'Низький',    color: '#4ade80', total: 0, hits: 0 },
+    normal   : { label: 'Звичайний',  color: '#facc15', total: 0, hits: 0 },
+    elevated : { label: 'Підвищений', color: '#f97316', total: 0, hits: 0 },
+    high     : { label: 'Високий',    color: '#ef4444', total: 0, hits: 0 },
   }
-  return { truePos: truePos, falsePos: falsePos, falseNeg: falseNeg, total: known.length, precision: precision, recall: recall }
+
+  forecasts.forEach(function(forecast) {
+    var bp = forecast.base_prob || baseProb || 0.12
+    forecast.slots.forEach(function(slot) {
+      if (slot.had_alert === null) return
+      var ratio = slot.prob / Math.max(bp, 0.01)
+      var key = ratio < 0.7 ? 'low' : ratio < 1.3 ? 'normal' : ratio < 1.8 ? 'elevated' : 'high'
+      levels[key].total++
+      if (slot.had_alert === true) levels[key].hits++
+    })
+  })
+
+  var hasData = Object.values(levels).some(function(l) { return l.total > 0 })
+  if (!hasData) return null
+
+  Object.values(levels).forEach(function(l) {
+    l.pct   = l.total > 0 ? Math.round(l.hits / l.total * 100) : null
+    l.width = l.pct !== null ? l.pct : 0
+  })
+
+  return levels
 }
 
 export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyActuals }) {
@@ -240,7 +230,7 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
   var nowIndex = chartData.findIndex(function(r) { return r.isNow })
 
   // Точність
-  var accuracy = calcAccuracy(historyData, hourlyActuals)
+  var calibration = calcCalibration(savedForecasts, baseProb)
 
   return (
     <div className="chart-card">
@@ -287,34 +277,27 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
         </div>
       </div>
 
-      {accuracy && (
-        <div className="fc-accuracy">
-          <div className="fc-acc-main">
-            <span className="fc-acc-value">{accuracy.precision}%</span>
-            <span className="fc-acc-label">precision · з {accuracy.total} прогнозів</span>
-          </div>
-          <div className="fc-acc-grid">
-            <div className="fc-acc-cell fc-acc-cell--good">
-              <span className="fc-acc-num">{accuracy.truePos}</span>
-              <span className="fc-acc-desc">тривога справді була</span>
-            </div>
-            <div className="fc-acc-cell fc-acc-cell--bad">
-              <span className="fc-acc-num">{accuracy.falsePos}</span>
-              <span className="fc-acc-desc">тривоги не було</span>
-            </div>
-            {accuracy.recall !== null && (
-              <>
-                <div className="fc-acc-cell fc-acc-cell--good">
-                  <span className="fc-acc-num">{accuracy.recall}%</span>
-                  <span className="fc-acc-desc">recall</span>
+      {calibration && (
+        <div className="fc-calibration">
+          <div className="fc-cal-title">Калібрування шкали загрози</div>
+          {Object.entries(calibration).map(function(entry) {
+            var key = entry[0]
+            var lev = entry[1]
+            if (lev.total === 0) return null
+            return (
+              <div key={key} className="fc-cal-row">
+                <span className="fc-cal-label" style={{ color: lev.color }}>{lev.label}</span>
+                <div className="fc-cal-track">
+                  <div className="fc-cal-fill" style={{ width: lev.width + '%', background: lev.color }} />
                 </div>
-                <div className="fc-acc-cell fc-acc-cell--bad">
-                  <span className="fc-acc-num">{accuracy.falseNeg}</span>
-                  <span className="fc-acc-desc">пропущено тривог</span>
-                </div>
-              </>
-            )}
-          </div>
+                <span className="fc-cal-pct" style={{ color: lev.color }}>
+                  {lev.pct !== null ? lev.pct + '%' : '—'}
+                </span>
+                <span className="fc-cal-count">({lev.hits}/{lev.total})</span>
+              </div>
+            )
+          })}
+          <div className="fc-cal-note">% тривог що відбулись при кожному рівні загрози</div>
         </div>
       )}
 
