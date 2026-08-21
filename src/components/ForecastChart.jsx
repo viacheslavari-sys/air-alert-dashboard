@@ -185,21 +185,43 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
     })
   }
 
+  // Базова ймовірність — середня по всіх годинах накопиченої історії
+  var baseProb = (function() {
+    if (!alerts || alerts.length === 0) return 0.12
+    var sorted = alerts.slice().sort(function(a, b) {
+      return new Date(a.started_at) - new Date(b.started_at)
+    })
+    var firstDate = new Date(sorted[0].started_at)
+    var totalHours = Math.max(1, Math.round((Date.now() - firstDate.getTime()) / 3600000))
+    return alerts.length / totalHours
+  })()
+
+  // Рівень загрози відносно базової імовірності
+  function threatLevel(prob) {
+    var ratio = prob / Math.max(baseProb, 0.01)
+    if (ratio < 0.7)  return { level: 'low',      label: 'Низький',    color: '#4ade80', width: 15 }
+    if (ratio < 1.3)  return { level: 'normal',   label: 'Звичайний',  color: '#facc15', width: 35 }
+    if (ratio < 1.8)  return { level: 'elevated', label: 'Підвищений', color: '#f97316', width: 65 }
+    return               { level: 'high',     label: 'Високий',   color: '#ef4444', width: 90 }
+  }
+
   // Поточний прогноз на 6 годин
   var forecast  = computeForecast(alerts, 6)
   // Показуємо всі майбутні слоти — завжди є зона справа від "Зараз"
   var futureData = forecast.slots
     .map(function(s) {
+      var threat = threatLevel(s.adjustedProbability)
       return {
-        dt       : s.label,
-        label    : s.label,
-        prob     : s.adjustedProbability,
-        ciLo     : s.ciLow,
-        ciHi     : s.ciHigh,
-        observed : s.observed,
-        hits     : s.hits,
-        had_alert: null,
-        isFuture : true,
+        dt        : s.label,
+        label     : s.label,
+        prob      : s.adjustedProbability,
+        ciLo      : s.ciLow,
+        ciHi      : s.ciHigh,
+        observed  : s.observed,
+        hits      : s.hits,
+        had_alert : null,
+        isFuture  : true,
+        threat    : threat,
       }
     })
 
@@ -243,6 +265,25 @@ export function ForecastChart({ alertsMap, regionKeys, forecastHistory, hourlyAc
               )
             })}
           </div>
+        </div>
+      </div>
+
+      {/* ── Шкала загрози ── */}
+      <div className="threat-gauge">
+        {futureData.map(function(s) {
+          var t = s.threat || { level: 'normal', label: 'Звичайний', color: '#facc15', width: 35 }
+          return (
+            <div key={s.label} className="tg-row">
+              <span className="tg-hour">{s.label}</span>
+              <div className="tg-track">
+                <div className="tg-fill" style={{ width: t.width + '%', background: t.color }} />
+              </div>
+              <span className="tg-label" style={{ color: t.color }}>{t.label}</span>
+            </div>
+          )
+        })}
+        <div className="tg-note">
+          {'Базова: ' + Math.round(baseProb * 100) + '% · рівень відносно норми'}
         </div>
       </div>
 
