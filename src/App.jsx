@@ -3,7 +3,6 @@ import { useAlertsData } from './hooks/useAlertsData'
 import { RegionFilter } from './components/RegionFilter'
 import { StatsCards } from './components/StatsCards'
 import { HeatmapWithFinder } from './components/HeatmapWithFinder'
-import { ForecastChart } from './components/ForecastChart'
 import { DailyAlertsChart } from './components/DailyAlertsChart'
 
 export default function App() {
@@ -31,9 +30,7 @@ export default function App() {
   var kyiv      = _data.kyiv
   var zhytomyr  = _data.zhytomyr
   var historyDays     = _data.historyDays
-  var forecastHistory = _data.forecastHistory
   var dailyCounts     = _data.dailyCounts
-  var hourlyActuals   = _data.hourlyActuals
 
   var _region      = useState('kyiv')
   var selectedRegion = _region[0]
@@ -120,12 +117,6 @@ export default function App() {
             <HeatmapWithFinder
               alerts={current.alerts}
               regionKey={selectedRegion}
-            />
-            <ForecastChart
-              alertsMap={{ [selectedRegion]: current.alerts }}
-              regionKeys={[selectedRegion]}
-              forecastHistory={forecastHistory}
-              hourlyActuals={hourlyActuals && hourlyActuals[selectedRegion]}
             />
             <DailyAlertsChart
               alertsMap={{ kyiv: kyiv && kyiv.alerts, zhytomyr: zhytomyr && zhytomyr.alerts }}
