@@ -1,6 +1,7 @@
 const REGION_OPTIONS = [
   { key: 'kyiv',     label: 'Вишгородський р-н', sub: 'Київська обл.' },
   { key: 'zhytomyr', label: 'Житомирський р-н',  sub: 'Житомирська обл.' },
+  { key: 'rivne',    label: 'Рівненський р-н',   sub: 'Рівненська обл.' },
 ]
 
 export function RegionFilter({ selected, onChange }) {

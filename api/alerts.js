@@ -1,8 +1,9 @@
 const API_BASE = 'https://api.alerts.in.ua/v1'
 
 const REGIONS = {
-  kyiv    : { uid: 14, titles: ['Вишгородський район', 'Київська область'] },
-  zhytomyr: { uid: 10, titles: ['Житомирський район',  'Житомирська область'] },
+  kyiv    : { uid: 14, titles: ['Вишгородський район'] },
+  zhytomyr: { uid: 10, titles: ['Житомирський район'] },
+  rivne   : { uid: 5,  titles: ['Рівненський район'] },
 }
 
 module.exports = async function handler(req, res) {

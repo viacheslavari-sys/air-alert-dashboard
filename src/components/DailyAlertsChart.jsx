@@ -14,14 +14,16 @@ const RANGE_OPTIONS = [
 const REGIONS = {
   kyiv    : { name: 'Вишгород', color: '#3b82f6' },
   zhytomyr: { name: 'Житомир',  color: '#f97316' },
+  rivne   : { name: 'Рівне',    color: '#10b981' },
 }
 
 var DAY_NAMES = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
 
-function buildFromDailyCounts(kyivCounts, zhytomyrCounts) {
+function buildFromDailyCounts(kyivCounts, zhytomyrCounts, rivneCounts) {
   var allDates = new Set()
   if (kyivCounts)     Object.keys(kyivCounts).forEach(function(d) { allDates.add(d) })
   if (zhytomyrCounts) Object.keys(zhytomyrCounts).forEach(function(d) { allDates.add(d) })
+  if (rivneCounts)    Object.keys(rivneCounts).forEach(function(d) { allDates.add(d) })
   if (allDates.size === 0) return []
   return Array.from(allDates).sort().map(function(date) {
     return {
@@ -29,6 +31,7 @@ function buildFromDailyCounts(kyivCounts, zhytomyrCounts) {
       label   : new Date(date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }),
       kyiv    : kyivCounts     ? (kyivCounts[date]     || 0) : null,
       zhytomyr: zhytomyrCounts ? (zhytomyrCounts[date] || 0) : null,
+      rivne   : rivneCounts    ? (rivneCounts[date]    || 0) : null,
     }
   })
 }
@@ -207,10 +210,11 @@ function ComparisonBlock({ cmp }) {
 export function DailyAlertsChart({ alertsMap, dailyCounts }) {
   var kyivCounts     = dailyCounts && dailyCounts.kyiv
   var zhytomyrCounts = dailyCounts && dailyCounts.zhytomyr
+  var rivneCounts    = dailyCounts && dailyCounts.rivne
 
   var data
-  if (kyivCounts || zhytomyrCounts) {
-    data = buildFromDailyCounts(kyivCounts, zhytomyrCounts)
+  if (kyivCounts || zhytomyrCounts || rivneCounts) {
+    data = buildFromDailyCounts(kyivCounts, zhytomyrCounts, rivneCounts)
   } else {
     var kyivAlerts = alertsMap && alertsMap.kyiv ? alertsMap.kyiv : []
     data = buildFromAlerts(kyivAlerts, 'kyiv')
@@ -227,6 +231,7 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
   var days          = filteredData.length
   var kyivTotal     = filteredData.reduce(function(s, d) { return s + (d.kyiv || 0) }, 0)
   var zhytomyrTotal = filteredData.reduce(function(s, d) { return s + (d.zhytomyr || 0) }, 0)
+  var rivneTotal    = filteredData.reduce(function(s, d) { return s + (d.rivne || 0) }, 0)
   var cmp           = calcComparison(filteredData, kyivTotal, zhytomyrTotal)
   var enriched      = enrichWithTrend(filteredData)
   var chartRows     = enriched.data
@@ -236,6 +241,7 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
   var tickInterval  = days <= 30 ? 6 : days <= 60 ? 9 : days <= 90 ? 14 : 20
   var showKyiv      = kyivCounts != null || (alertsMap && alertsMap.kyiv)
   var showZhytomyr  = zhytomyrCounts != null
+  var showRivne     = rivneCounts != null
 
   return (
     <div className="chart-card">
@@ -275,6 +281,12 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
               <span className="legend-text">{REGIONS.zhytomyr.name} · {zhytomyrTotal}</span>
             </span>
           )}
+          {showRivne && (
+            <span className="legend-item">
+              <span className="legend-dot" style={{ background: REGIONS.rivne.color }} />
+              <span className="legend-text">{REGIONS.rivne.name} · {rivneTotal}</span>
+            </span>
+          )}
           <span className="legend-item">
             <span className="legend-line" style={{ background: '#93c5fd' }} />
             <span className="legend-text">Середнє 7дн</span>
@@ -301,6 +313,10 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
                 <stop offset="5%"  stopColor={REGIONS.zhytomyr.color} stopOpacity={0.35} />
                 <stop offset="95%" stopColor={REGIONS.zhytomyr.color} stopOpacity={0.02} />
               </linearGradient>
+              <linearGradient id="gradRivne" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor={REGIONS.rivne.color} stopOpacity={0.35} />
+                <stop offset="95%" stopColor={REGIONS.rivne.color} stopOpacity={0.02} />
+              </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
             <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 10 }} tickLine={false} axisLine={false} interval={tickInterval} />
@@ -315,6 +331,11 @@ export function DailyAlertsChart({ alertsMap, dailyCounts }) {
               <Area type="monotone" dataKey="zhytomyr" name={REGIONS.zhytomyr.name}
                 stroke={REGIONS.zhytomyr.color} strokeWidth={2} fill="url(#gradZhytomyr)"
                 dot={false} activeDot={{ r: 4, fill: REGIONS.zhytomyr.color, strokeWidth: 0 }} />
+            )}
+            {showRivne && (
+              <Area type="monotone" dataKey="rivne" name={REGIONS.rivne.name}
+                stroke={REGIONS.rivne.color} strokeWidth={2} fill="url(#gradRivne)"
+                dot={false} activeDot={{ r: 4, fill: REGIONS.rivne.color, strokeWidth: 0 }} />
             )}
             {/* Ковзне середнє (7 днів) */}
             {showKyiv && (

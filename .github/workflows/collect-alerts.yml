@@ -55,13 +55,25 @@ jobs:
           fi
           echo "✅ Zhytomyr: HTTP $HTTP"
 
+          echo "Fetching Rivne oblast..."
+          HTTP=$(curl -s -o /tmp/rivne_fresh.json -w "%{http_code}" \
+            -H "Authorization: Bearer $ALERTS_TOKEN" \
+            -H "Accept: application/json" \
+            "https://api.alerts.in.ua/v1/regions/5/alerts/month_ago.json")
+          if [ "$HTTP" != "200" ]; then
+            echo "⚠️ Rivne fetch failed: HTTP $HTTP — continuing without Rivne (check UID)"
+            echo '{"alerts":[]}' > /tmp/rivne_fresh.json
+          else
+            echo "✅ Rivne: HTTP $HTTP"
+          fi
+
           node << 'NODEEOF'
           const fs = require('fs')
 
           // ── Читаємо поточну історію ───────────────────────────────────
           let existing = {
-            kyiv: [], zhytomyr: [],
-            forecasts: { kyiv: [], zhytomyr: [] },
+            kyiv: [], zhytomyr: [], rivne: [],
+            forecasts: { kyiv: [], zhytomyr: [], rivne: [] },
             collection_started_at: null,
           }
           try {
@@ -69,12 +81,14 @@ jobs:
           } catch (e) {
             console.log('history.json not found, starting fresh')
           }
-          if (!existing.forecasts) existing.forecasts = { kyiv: [], zhytomyr: [] }
+          if (!existing.forecasts) existing.forecasts = { kyiv: [], zhytomyr: [], rivne: [] }
           if (!existing.forecasts.kyiv) existing.forecasts.kyiv = []
           if (!existing.forecasts.zhytomyr) existing.forecasts.zhytomyr = []
+          if (!existing.forecasts.rivne) existing.forecasts.rivne = []
 
           const kyivFresh     = JSON.parse(fs.readFileSync('/tmp/kyiv_fresh.json',     'utf8'))
           const zhytomyrFresh = JSON.parse(fs.readFileSync('/tmp/zhytomyr_fresh.json', 'utf8'))
+          const rivneFresh    = JSON.parse(fs.readFileSync('/tmp/rivne_fresh.json',    'utf8'))
 
           // ── Злиття тривог ─────────────────────────────────────────────
           function merge(existing, incoming) {
@@ -94,11 +108,14 @@ jobs:
 
           const MERGE_KYIV_FILTER     = ['Вишгородський район']
           const MERGE_ZHYTOMYR_FILTER = ['Житомирський район']
+          const MERGE_RIVNE_FILTER    = ['Рівненський район']
 
           const kyivAll     = merge(existing.kyiv,     kyivFresh)
             .filter(function(a) { return MERGE_KYIV_FILTER.indexOf(a.location_title) !== -1 })
           const zhytomyrAll = merge(existing.zhytomyr, zhytomyrFresh)
             .filter(function(a) { return MERGE_ZHYTOMYR_FILTER.indexOf(a.location_title) !== -1 })
+          const rivneAll    = merge(existing.rivne,    rivneFresh)
+            .filter(function(a) { return MERGE_RIVNE_FILTER.indexOf(a.location_title) !== -1 })
 
           // ── Заповнюємо had_alert для вчорашніх прогнозів ─────────────
           function fillActuals(forecasts, alerts) {
@@ -135,6 +152,7 @@ jobs:
 
           existing.forecasts.kyiv     = fillActuals(existing.forecasts.kyiv,     kyivAll)
           existing.forecasts.zhytomyr = fillActuals(existing.forecasts.zhytomyr, zhytomyrAll)
+          existing.forecasts.rivne    = fillActuals(existing.forecasts.rivne,    rivneAll)
 
           // ── Генеруємо прогноз на наступні 6 годин ────────────────────
           // Використовуємо просту статистику по годинах з накопичених даних
@@ -206,18 +224,24 @@ jobs:
           // Фільтруємо по районах — як і на фронтенді
           const KYIV_F     = ['Вишгородський район']
           const ZHYTOMYR_F = ['Житомирський район']
+          const RIVNE_F    = ['Рівненський район']
           var kyivFiltered     = kyivAll.filter(function(a) { return KYIV_F.indexOf(a.location_title) !== -1 })
           var zhytomyrFiltered = zhytomyrAll.filter(function(a) { return ZHYTOMYR_F.indexOf(a.location_title) !== -1 })
+          var rivneFiltered    = rivneAll.filter(function(a) { return RIVNE_F.indexOf(a.location_title) !== -1 })
           var kyivForecast     = makeForecast(kyivFiltered)
           var zhytomyrForecast = makeForecast(zhytomyrFiltered)
+          var rivneForecast    = makeForecast(rivneFiltered)
           if (kyivForecast)     existing.forecasts.kyiv.push(kyivForecast)
           if (zhytomyrForecast) existing.forecasts.zhytomyr.push(zhytomyrForecast)
+          if (rivneForecast)    existing.forecasts.rivne.push(rivneForecast)
 
           // Тримаємо останні 2000 прогнозів
           if (existing.forecasts.kyiv.length > 90)
             existing.forecasts.kyiv = existing.forecasts.kyiv.slice(-2000)
           if (existing.forecasts.zhytomyr.length > 90)
             existing.forecasts.zhytomyr = existing.forecasts.zhytomyr.slice(-2000)
+          if (existing.forecasts.rivne.length > 90)
+            existing.forecasts.rivne = existing.forecasts.rivne.slice(-2000)
 
           // ── Будуємо hourly_actuals ───────────────────────────────────
           // Для кожного дня і кожної години: 1 якщо була тривога, 0 якщо ні
@@ -262,6 +286,7 @@ jobs:
           // ── Будуємо daily_counts ─────────────────────────────────────
           const KYIV_FILTER     = ['Вишгородський район']
           const ZHYTOMYR_FILTER = ['Житомирський район']
+          const RIVNE_FILTER    = ['Рівненський район']
 
           function buildDailyCounts(alerts, filter) {
             const filtered = alerts.filter(function(a) {
@@ -297,7 +322,7 @@ jobs:
           const collectionStart = existing.collection_started_at || now
 
           // Рахуємо від найстарішої тривоги в обох регіонах
-          const allAlerts  = kyivAll.concat(zhytomyrAll)
+          const allAlerts  = kyivAll.concat(zhytomyrAll).concat(rivneAll)
           const oldestDate = allAlerts.length > 0
             ? new Date(allAlerts[allAlerts.length - 1].started_at)
             : new Date(collectionStart)
@@ -306,14 +331,17 @@ jobs:
           const result = {
             kyiv                 : kyivAll,
             zhytomyr             : zhytomyrAll,
+            rivne                : rivneAll,
             forecasts            : existing.forecasts,
             daily_counts         : {
               kyiv    : buildDailyCounts(kyivAll,     KYIV_FILTER),
               zhytomyr: buildDailyCounts(zhytomyrAll, ZHYTOMYR_FILTER),
+              rivne   : buildDailyCounts(rivneAll,    RIVNE_FILTER),
             },
             hourly_actuals        : {
               kyiv    : buildHourlyActuals(kyivAll,     KYIV_FILTER,     collectionStart),
               zhytomyr: buildHourlyActuals(zhytomyrAll, ZHYTOMYR_FILTER, collectionStart),
+              rivne   : buildHourlyActuals(rivneAll,    RIVNE_FILTER,    collectionStart),
             },
             collection_started_at: collectionStart,
             updated_at           : now,
@@ -322,6 +350,7 @@ jobs:
 
           console.log('Kyiv total:          ' + result.kyiv.length)
           console.log('Zhytomyr total:      ' + result.zhytomyr.length)
+          console.log('Rivne total:         ' + result.rivne.length)
           console.log('Kyiv forecasts:      ' + result.forecasts.kyiv.length)
           console.log('Zhytomyr forecasts:  ' + result.forecasts.zhytomyr.length)
           console.log('Days collected:      ' + result.days_collected)

@@ -14,7 +14,8 @@ const HISTORY_URL = '/api/history'
 // Які location_title вважати релевантними для кожного регіону
 const REGION_FILTERS = {
   kyiv    : ['Вишгородський район'],
-  zhytomyr: ['Житомирський район',  'Житомирська область'],
+  zhytomyr: ['Житомирський район'],
+  rivne   : ['Рівненський район'],
 }
 
 function normalizeAlert(a) {
@@ -97,7 +98,7 @@ function calcHistoryDays(alerts) {
 }
 
 export function useAlertsData() {
-  var _state   = useState({ loading: true, error: null, isMock: USE_MOCK, kyiv: null, zhytomyr: null, historyDays: 30, forecastHistory: null, dailyCounts: null, hourlyActuals: null })
+  var _state   = useState({ loading: true, error: null, isMock: USE_MOCK, kyiv: null, zhytomyr: null, rivne: null, historyDays: 30, forecastHistory: null, dailyCounts: null, hourlyActuals: null })
   var state    = _state[0]
   var setState = _state[1]
 
@@ -110,7 +111,7 @@ export function useAlertsData() {
         var za = generateMockAlerts()
         if (!cancelled) setState({
           loading: false, error: null, isMock: true,
-          kyiv: buildRegionState(ka), zhytomyr: buildRegionState(za),
+          kyiv: buildRegionState(ka), zhytomyr: buildRegionState(za), rivne: buildRegionState(generateMockAlerts()),
           historyDays: 30,
         })
         return
@@ -120,12 +121,14 @@ export function useAlertsData() {
         var results = await Promise.all([
           fetchRegion('kyiv'),
           fetchRegion('zhytomyr'),
+          fetchRegion('rivne'),
           fetchAccumulated(),
         ])
 
         var kyivFresh     = normalizeAlerts(results[0])
         var zhytomyrFresh = normalizeAlerts(results[1])
-        var accumulated   = results[2]
+        var rivneFresh    = normalizeAlerts(results[2])
+        var accumulated   = results[3]
 
         // Фільтруємо накопичені дані по релевантних районах
         var kyivAcc = accumulated && Array.isArray(accumulated.kyiv)
@@ -134,9 +137,13 @@ export function useAlertsData() {
         var zhytomyrAcc = accumulated && Array.isArray(accumulated.zhytomyr)
           ? filterByRegion(accumulated.zhytomyr, 'zhytomyr')
           : []
+        var rivneAcc = accumulated && Array.isArray(accumulated.rivne)
+          ? filterByRegion(accumulated.rivne, 'rivne')
+          : []
 
         var kyivAll     = mergeAlerts(kyivFresh,     kyivAcc)
         var zhytomyrAll = mergeAlerts(zhytomyrFresh, zhytomyrAcc)
+        var rivneAll    = mergeAlerts(rivneFresh,    rivneAcc)
 
         // Використовуємо лічильник з history.json якщо він є
         var daysCollected = accumulated && accumulated.days_collected
@@ -149,6 +156,7 @@ export function useAlertsData() {
           isMock         : false,
           kyiv           : buildRegionState(kyivAll, daysCollected),
           zhytomyr       : buildRegionState(zhytomyrAll, daysCollected),
+          rivne          : buildRegionState(rivneAll, daysCollected),
           historyDays    : daysCollected,
           forecastHistory: accumulated && accumulated.forecasts ? accumulated.forecasts : null,
           dailyCounts    : accumulated && accumulated.daily_counts ? accumulated.daily_counts : null,
@@ -157,9 +165,10 @@ export function useAlertsData() {
       } catch (err) {
         var kf = generateMockAlerts()
         var zf = generateMockAlerts()
+        var rf = generateMockAlerts()
         if (!cancelled) setState({
           loading: false, error: err.message, isMock: true,
-          kyiv: buildRegionState(kf), zhytomyr: buildRegionState(zf),
+          kyiv: buildRegionState(kf), zhytomyr: buildRegionState(zf), rivne: buildRegionState(rf),
           historyDays: 30,
         })
       }

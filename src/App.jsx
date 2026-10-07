@@ -29,6 +29,7 @@ export default function App() {
   var isMock    = _data.isMock
   var kyiv      = _data.kyiv
   var zhytomyr  = _data.zhytomyr
+  var rivne     = _data.rivne
   var historyDays     = _data.historyDays
   var dailyCounts     = _data.dailyCounts
 
@@ -36,12 +37,15 @@ export default function App() {
   var selectedRegion = _region[0]
   var setRegion      = _region[1]
 
-  var dataMap = { kyiv: kyiv, zhytomyr: zhytomyr }
+  var dataMap = { kyiv: kyiv, zhytomyr: zhytomyr, rivne: rivne }
   var current = dataMap[selectedRegion]
 
-  var regionLabel = selectedRegion === 'kyiv'
-    ? 'Вишгородський р-н · Київська обл.'
-    : 'Житомирський р-н · Житомирська обл.'
+  var REGION_LABELS = {
+    kyiv    : 'Вишгородський р-н · Київська обл.',
+    zhytomyr: 'Житомирський р-н · Житомирська обл.',
+    rivne   : 'Рівненський р-н · Рівненська обл.',
+  }
+  var regionLabel = REGION_LABELS[selectedRegion] || ''
 
   // StatsCards очікує statsMap і regionKeys — адаптуємо
   var statsMap   = {}
@@ -119,7 +123,7 @@ export default function App() {
               regionKey={selectedRegion}
             />
             <DailyAlertsChart
-              alertsMap={{ kyiv: kyiv && kyiv.alerts, zhytomyr: zhytomyr && zhytomyr.alerts }}
+              alertsMap={{ kyiv: kyiv && kyiv.alerts, zhytomyr: zhytomyr && zhytomyr.alerts, rivne: rivne && rivne.alerts }}
               dailyCounts={dailyCounts}
             />
           </>
